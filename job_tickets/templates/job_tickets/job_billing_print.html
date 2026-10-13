@@ -974,6 +974,12 @@
                     <span class="info-label">Serial / IMEI:</span>
                     <span class="info-value">{{ job.device_serial|default:"N/A" }}</span>
                 </div>
+                {% if job.original_job_ticket %}
+                <div class="info-row">
+                    <span class="info-label">Prev Ticket:</span>
+                    <span class="info-value">Ref <strong>#{{ job.original_job_ticket.job_code }}</strong>{% if job.original_job_ticket.created_at %} ({{ job.original_job_ticket.created_at|date:"d M Y" }}){% endif %}</span>
+                </div>
+                {% endif %}
                 <div class="info-row">
                     <span class="info-label">Serviced By:</span>
                     <span class="info-value">{{ serviced_by|default:"Workshop Staff" }}</span>

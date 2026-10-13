@@ -438,7 +438,9 @@
             </div>
             <div class="card-body p-3 p-md-3.5 bg-white">
                 <form method="post" novalidate id="job-creation-form" 
-                    data-phone-lookup-url="{% url 'client_phone_lookup' %}" enctype="multipart/form-data"
+                    data-phone-lookup-url="{% url 'client_phone_lookup' %}"
+                    data-job-lookup-url="{% url 'job_ticket_lookup' %}"
+                    enctype="multipart/form-data"
                     data-no-loader="true">
                     {% csrf_token %}
                     <input type="hidden" name="job_ticket_form_submit" value="true">
@@ -450,6 +452,29 @@
 
                         <!-- STEP 1: CUSTOMER INFORMATION -->
                         <div class="tab-pane fade show active" id="intake-step-customer" role="tabpanel" aria-labelledby="step-customer-tab">
+
+                            <!-- Repeat Device / Old Job # Barcode Search -->
+                            <div class="p-2.5 mb-3 rounded-3 border bg-light d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-left: 4px solid #3b82f6 !important;">
+                                <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 520px;">
+                                    <span class="small fw-bold text-dark text-nowrap">
+                                        <i class="fas fa-barcode text-primary me-1"></i> Repeat Device / Old Job #:
+                                    </span>
+                                    <div class="input-group input-group-sm flex-nowrap">
+                                        <input type="text" id="lookup_old_job_input" class="form-control"
+                                            placeholder="Enter Job # (e.g. 1042) or scan barcode" autocomplete="off"
+                                            style="font-family: monospace; font-weight: 600;">
+                                        <button type="button" class="btn btn-primary px-3 fw-semibold d-inline-flex align-items-center gap-1" id="btn_lookup_old_job">
+                                            <i class="fas fa-search"></i> <span>Find</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="small text-muted d-none d-md-block">
+                                    <i class="fas fa-lightbulb text-warning me-1"></i> Auto-prefills customer &amp; device specs from past repair
+                                </div>
+                            </div>
+
+                            <div id="old-job-intel-container" class="mb-3 d-none"></div>
+
                             <div class="row g-2.5 align-items-start">
                                 <div class="col-md-3 col-sm-6">
                                     <label for="id_job_date" class="form-label small fw-semibold text-secondary mb-1">
@@ -717,6 +742,37 @@
     <template id="device-form-template">
         <div class="device-form-block tab-pane fade card border shadow-sm p-3 mb-2.5 rounded-3" id="device-pane-INDEX" role="tabpanel" aria-labelledby="device-subtab-INDEX" style="border-color: #e2e8f0 !important; background: #ffffff;">
             <div class="row g-2.5">
+                <!-- Previous Service Link Badge / Input -->
+                <div class="col-md-12 device-prev-job-bar mb-1">
+                    <input type="hidden" name="device_forms[INDEX].original_job_code" class="device-original-job-code" value="">
+                    <div class="device-prev-job-badge-container d-none py-1 px-2.5 rounded-2 bg-warning-subtle border border-warning-subtle d-flex align-items-center justify-content-between gap-2" style="font-size: 0.78rem;">
+                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                            <i class="fas fa-history text-warning-emphasis"></i>
+                            <span class="fw-semibold text-warning-emphasis">Linked to Previous Service:</span>
+                            <strong class="text-dark device-prev-job-label font-monospace"></strong>
+                            <span class="text-secondary small device-prev-job-meta"></span>
+                        </div>
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0 text-decoration-none remove-device-prev-job-btn" style="font-size: 0.74rem;">
+                            <i class="fas fa-times me-0.5"></i> Unlink
+                        </button>
+                    </div>
+                    <div class="device-link-old-job-toggle-box">
+                        <button type="button" class="btn btn-sm btn-link text-primary p-0 text-decoration-none toggle-link-old-job-btn" style="font-size: 0.75rem;">
+                            <i class="fas fa-history me-1"></i> Link an Old Job # to this device
+                        </button>
+                        <div class="device-link-old-job-input-box d-none mt-1">
+                            <div class="input-group input-group-sm" style="max-width: 320px;">
+                                <input type="text" class="form-control form-control-sm device-old-job-query-input" placeholder="e.g. 1042 or scan barcode" style="font-family: monospace;">
+                                <button type="button" class="btn btn-outline-primary btn-sm device-old-job-fetch-btn py-0 px-2.5" style="font-size: 0.78rem;">
+                                    <i class="fas fa-search me-1"></i> Fetch
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm cancel-link-old-job-btn py-0 px-1.5" style="font-size: 0.78rem;">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="col-md-2 col-sm-6">
                     <label class="form-label fw-semibold text-secondary small mb-1">
                         Device Type <span class="text-danger">*</span>
@@ -1233,6 +1289,11 @@
         const pendingJobsBody = document.getElementById('pending-jobs-body');
         const csrfToken = jobForm?.querySelector('[name=csrfmiddlewaretoken]')?.value || document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
         const phoneLookupUrl = jobForm?.dataset?.phoneLookupUrl || '';
+        const jobLookupUrl = jobForm?.dataset?.jobLookupUrl || '';
+        const lookupOldJobInput = document.getElementById('lookup_old_job_input');
+        const btnLookupOldJob = document.getElementById('btn_lookup_old_job');
+        const oldJobIntelContainer = document.getElementById('old-job-intel-container');
+        let currentBatchDevices = [];
         const shouldReopenCreateJobModal = {% if show_create_job_modal %}true{% else %}false{% endif %};
     let formIndex = 0;
     let phoneLookupTimer = null;
@@ -1541,6 +1602,210 @@
         } catch (error) {
             console.error('Phone lookup failed:', error);
         }
+    }
+
+    function populateDeviceFormWithData(formBlock, devData) {
+        if (!formBlock || !devData) return;
+        const typeInput = formBlock.querySelector('.device-type-input');
+        const brandInput = formBlock.querySelector('[data-device-field="device_brand"]');
+        const modelInput = formBlock.querySelector('input[name*=".device_model"]');
+        const serialInput = formBlock.querySelector('input[name*=".device_serial"]');
+        const passwordInput = formBlock.querySelector('input[name*=".device_password"]');
+        const warrantySwitch = formBlock.querySelector('input[name*=".is_under_warranty"]');
+        const origJobInput = formBlock.querySelector('.device-original-job-code');
+        const badgeContainer = formBlock.querySelector('.device-prev-job-badge-container');
+        const badgeLabel = formBlock.querySelector('.device-prev-job-label');
+        const badgeMeta = formBlock.querySelector('.device-prev-job-meta');
+        const toggleBox = formBlock.querySelector('.device-link-old-job-toggle-box');
+
+        if (typeInput && devData.device_type) typeInput.value = devData.device_type;
+        if (brandInput && devData.device_brand) brandInput.value = devData.device_brand;
+        if (modelInput && devData.device_model) modelInput.value = devData.device_model;
+        if (serialInput && devData.device_serial) serialInput.value = devData.device_serial;
+        if (passwordInput && devData.device_password) passwordInput.value = devData.device_password;
+        if (warrantySwitch && devData.is_under_warranty) warrantySwitch.checked = true;
+
+        if (origJobInput) origJobInput.value = devData.job_code || '';
+        if (badgeLabel) badgeLabel.textContent = '#' + (devData.job_code || '');
+        if (badgeMeta) {
+            badgeMeta.textContent = devData.intake_date ? `(Intake: ${devData.intake_date})` : '';
+        }
+        if (badgeContainer) badgeContainer.classList.remove('d-none');
+        if (toggleBox) toggleBox.classList.add('d-none');
+
+        syncDeviceChecklistToggle(formBlock);
+        updateSubTabLabel(formBlock);
+    }
+
+    function unlinkDeviceForm(formBlock) {
+        if (!formBlock) return;
+        const origJobInput = formBlock.querySelector('.device-original-job-code');
+        const badgeContainer = formBlock.querySelector('.device-prev-job-badge-container');
+        const toggleBox = formBlock.querySelector('.device-link-old-job-toggle-box');
+        const inputBox = formBlock.querySelector('.device-link-old-job-input-box');
+
+        if (origJobInput) origJobInput.value = '';
+        if (badgeContainer) badgeContainer.classList.add('d-none');
+        if (toggleBox) toggleBox.classList.remove('d-none');
+        if (inputBox) inputBox.classList.add('d-none');
+    }
+
+    async function queryJobLookup(query) {
+        const cleanQ = (query || '').trim();
+        if (!jobLookupUrl || !cleanQ) return null;
+        try {
+            const url = new URL(jobLookupUrl, window.location.origin);
+            url.searchParams.set('q', cleanQ);
+            const response = await fetch(url.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            });
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (err) {
+            console.error('Job lookup error:', err);
+            return null;
+        }
+    }
+
+    function renderOldJobLookupResult(data) {
+        if (!oldJobIntelContainer) return;
+        if (!data || !data.found) {
+            oldJobIntelContainer.className = 'mb-3';
+            oldJobIntelContainer.innerHTML = `
+                <div class="alert alert-warning py-2 px-3 mb-0 rounded-3 small d-flex justify-content-between align-items-center">
+                    <div>
+                        <i class="fas fa-exclamation-triangle me-1 text-warning"></i>
+                        <span>${escapeHtml(data?.message || 'No previous job ticket found with that number.')}</span>
+                    </div>
+                    <button type="button" class="btn-close btn-close-sm" onclick="this.closest('#old-job-intel-container').classList.add('d-none')"></button>
+                </div>
+            `;
+            return;
+        }
+
+        // Auto-fill customer data
+        if (customerPhoneInput && data.customer_phone) {
+            customerPhoneInput.value = formatIndianPhoneDisplay(data.customer_phone);
+            customerPhoneInput.dispatchEvent(new Event('input', { bubbles: true }));
+            fetchPhoneSnapshot(data.customer_phone);
+        }
+        if (customerNameInput && data.customer_name) {
+            customerNameInput.value = data.customer_name;
+            customerNameInput.dataset.userEdited = 'false';
+            customerNameInput.dataset.autoFilled = 'true';
+        }
+
+        currentBatchDevices = data.batch_devices || [data.primary_device];
+
+        if (!data.is_batch) {
+            // Single device found: automatically populate Device 0
+            const firstBlock = container?.querySelector('.device-form-block');
+            if (firstBlock) {
+                populateDeviceFormWithData(firstBlock, data.primary_device);
+            }
+
+            oldJobIntelContainer.className = 'mb-3';
+            oldJobIntelContainer.innerHTML = `
+                <div class="alert alert-success py-2.5 px-3 mb-0 rounded-3 shadow-xs d-flex flex-wrap align-items-center justify-content-between gap-2 border-success-subtle">
+                    <div>
+                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                            <span class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Prev Ticket #${escapeHtml(data.primary_device.job_code)}</span>
+                            <strong class="text-dark">${escapeHtml(data.primary_device.device_brand)} ${escapeHtml(data.primary_device.device_model)}</strong>
+                            <span class="text-secondary small">(${escapeHtml(data.primary_device.device_type)}${data.primary_device.device_serial ? ' • SN: ' + escapeHtml(data.primary_device.device_serial) : ''})</span>
+                            <span class="badge bg-secondary-subtle text-secondary border px-1.5 py-0.5" style="font-size:0.72rem;">Status: ${escapeHtml(data.primary_device.status)}</span>
+                        </div>
+                        <div class="small text-muted mt-1">
+                            Customer and device specifications pre-filled. New ticket will reference #${escapeHtml(data.primary_device.job_code)}.
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2.5" id="btn_dismiss_old_job_intel">
+                            <i class="fas fa-check me-1"></i> OK
+                        </button>
+                    </div>
+                </div>
+            `;
+            const dismissBtn = document.getElementById('btn_dismiss_old_job_intel');
+            if (dismissBtn) {
+                dismissBtn.addEventListener('click', () => oldJobIntelContainer.classList.add('d-none'));
+            }
+        } else {
+            // Multi-device batch found!
+            let pillsHtml = '';
+            currentBatchDevices.forEach((dev, idx) => {
+                pillsHtml += `
+                    <div class="card p-2 border rounded-2 flex-grow-1" style="min-width: 220px; max-width: 320px; background: #ffffff;">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <strong class="text-primary font-monospace">#${escapeHtml(dev.job_code)}</strong>
+                            <span class="badge bg-light text-dark border" style="font-size:0.7rem;">${escapeHtml(dev.device_type)}</span>
+                        </div>
+                        <div class="small fw-semibold text-dark">${escapeHtml(dev.device_brand)} ${escapeHtml(dev.device_model)}</div>
+                        <div class="text-muted" style="font-size:0.74rem;">SN: ${escapeHtml(dev.device_serial || 'None')}</div>
+                        <button type="button" class="btn btn-sm btn-primary w-100 mt-2 py-0.5 select-batch-device-btn" data-batch-idx="${idx}">
+                            <i class="fas fa-arrow-down me-1"></i> Use this device
+                        </button>
+                    </div>
+                `;
+            });
+
+            oldJobIntelContainer.className = 'mb-3';
+            oldJobIntelContainer.innerHTML = `
+                <div class="alert alert-info py-2.5 px-3 mb-0 rounded-3 shadow-xs border-info-subtle">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                        <div>
+                            <span class="fw-bold text-dark"><i class="fas fa-layer-group text-primary me-1"></i> Multi-Device Batch Found:</span>
+                            <span class="small text-muted ms-1">${currentBatchDevices.length} devices registered under submission from ${escapeHtml(data.primary_device.intake_date || 'past')}</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="button" class="btn btn-sm btn-primary py-1 px-2.5 fw-semibold shadow-xs" id="btn_import_all_batch_devices">
+                                <i class="fas fa-plus-circle me-1"></i> Import All ${currentBatchDevices.length} Devices
+                            </button>
+                            <button type="button" class="btn-close btn-close-sm" onclick="this.closest('#old-job-intel-container').classList.add('d-none')"></button>
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        ${pillsHtml}
+                    </div>
+                </div>
+            `;
+
+            oldJobIntelContainer.querySelectorAll('.select-batch-device-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const idx = parseInt(this.dataset.batchIdx, 10);
+                    const selDev = currentBatchDevices[idx];
+                    if (selDev) {
+                        const firstBlock = container?.querySelector('.device-form-block');
+                        if (firstBlock) populateDeviceFormWithData(firstBlock, selDev);
+                        showMessage('success', `Selected Device #${selDev.job_code} (${selDev.device_brand} ${selDev.device_model}).`);
+                    }
+                });
+            });
+
+            const importAllBtn = document.getElementById('btn_import_all_batch_devices');
+            if (importAllBtn) {
+                importAllBtn.addEventListener('click', function () {
+                    importAllBatchDevices(currentBatchDevices);
+                });
+            }
+        }
+    }
+
+    function importAllBatchDevices(devices) {
+        if (!devices || !devices.length || !container) return;
+        devices.forEach((dev, idx) => {
+            let blocks = container.querySelectorAll('.device-form-block');
+            let targetBlock = blocks[idx];
+            if (!targetBlock) {
+                addDeviceForm(false);
+                blocks = container.querySelectorAll('.device-form-block');
+                targetBlock = blocks[idx];
+            }
+            if (targetBlock) {
+                populateDeviceFormWithData(targetBlock, dev);
+            }
+        });
+        showMessage('success', `Imported all ${devices.length} devices from previous batch!`);
+        oldJobIntelContainer?.classList.add('d-none');
     }
 
     function clearMessages() {
@@ -1915,6 +2180,12 @@
         });
         container.innerHTML = '';
         formIndex = 0;
+        if (lookupOldJobInput) lookupOldJobInput.value = '';
+        if (oldJobIntelContainer) {
+            oldJobIntelContainer.innerHTML = '';
+            oldJobIntelContainer.classList.add('d-none');
+        }
+        currentBatchDevices = [];
         addDeviceForm(true);
     }
 
@@ -1957,6 +2228,7 @@
                         ${job.job_code}
                     </a>
                     <span class="badge bg-danger ms-1">NEW</span>
+                    ${job.original_job_code ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1" style="font-size:0.68rem;" title="Previous Job">Prev: #${job.original_job_code}</span>` : ''}
                 </td>
                 <td><span class="fw-semibold text-dark">${job.customer_name}</span></td>
                 <td><span class="text-secondary small">${job.customer_phone || '-'}</span></td>
@@ -2458,6 +2730,112 @@
 
     if (addButton) {
         addButton.addEventListener('click', () => addDeviceForm(false));
+    }
+
+    // Top-Level Old Job / Barcode Lookup Handlers
+    async function handleTopLevelLookup() {
+        if (!lookupOldJobInput) return;
+        const q = (lookupOldJobInput.value || '').trim();
+        if (!q) return;
+
+        if (btnLookupOldJob) {
+            btnLookupOldJob.disabled = true;
+            btnLookupOldJob.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+        }
+
+        const data = await queryJobLookup(q);
+
+        if (btnLookupOldJob) {
+            btnLookupOldJob.disabled = false;
+            btnLookupOldJob.innerHTML = '<i class="fas fa-search me-1"></i> <span>Find</span>';
+        }
+
+        renderOldJobLookupResult(data);
+    }
+
+    if (btnLookupOldJob) {
+        btnLookupOldJob.addEventListener('click', handleTopLevelLookup);
+    }
+    if (lookupOldJobInput) {
+        lookupOldJobInput.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleTopLevelLookup();
+            }
+        });
+    }
+
+    // Per-device Link & Unlink Event Delegation inside #device-forms-container
+    if (container) {
+        container.addEventListener('click', async function (e) {
+            const toggleBtn = e.target.closest('.toggle-link-old-job-btn');
+            if (toggleBtn) {
+                e.preventDefault();
+                const bar = toggleBtn.closest('.device-prev-job-bar');
+                const inputBox = bar?.querySelector('.device-link-old-job-input-box');
+                if (inputBox) {
+                    inputBox.classList.toggle('d-none');
+                    if (!inputBox.classList.contains('d-none')) {
+                        const qInput = inputBox.querySelector('.device-old-job-query-input');
+                        if (qInput) qInput.focus();
+                    }
+                }
+                return;
+            }
+
+            const cancelBtn = e.target.closest('.cancel-link-old-job-btn');
+            if (cancelBtn) {
+                e.preventDefault();
+                const bar = cancelBtn.closest('.device-prev-job-bar');
+                const inputBox = bar?.querySelector('.device-link-old-job-input-box');
+                if (inputBox) inputBox.classList.add('d-none');
+                return;
+            }
+
+            const unlinkBtn = e.target.closest('.remove-device-prev-job-btn');
+            if (unlinkBtn) {
+                e.preventDefault();
+                const formBlock = unlinkBtn.closest('.device-form-block');
+                if (formBlock) {
+                    unlinkDeviceForm(formBlock);
+                    showMessage('info', 'Unlinked device from previous job ticket.');
+                }
+                return;
+            }
+
+            const fetchBtn = e.target.closest('.device-old-job-fetch-btn');
+            if (fetchBtn) {
+                e.preventDefault();
+                const formBlock = fetchBtn.closest('.device-form-block');
+                const bar = fetchBtn.closest('.device-prev-job-bar');
+                const qInput = bar?.querySelector('.device-old-job-query-input');
+                const q = (qInput?.value || '').trim();
+                if (!q) return;
+
+                fetchBtn.disabled = true;
+                fetchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                const data = await queryJobLookup(q);
+                fetchBtn.disabled = false;
+                fetchBtn.innerHTML = '<i class="fas fa-search me-1"></i> Fetch';
+
+                if (data && data.found) {
+                    populateDeviceFormWithData(formBlock, data.primary_device);
+                    showMessage('success', `Linked device to previous job #${data.primary_device.job_code}.`);
+                } else {
+                    showMessage('error', data?.message || `No job ticket found matching "${q}".`);
+                }
+                return;
+            }
+        });
+
+        container.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.target.classList.contains('device-old-job-query-input')) {
+                e.preventDefault();
+                const bar = e.target.closest('.device-prev-job-bar');
+                const fetchBtn = bar?.querySelector('.device-old-job-fetch-btn');
+                if (fetchBtn) fetchBtn.click();
+            }
+        });
     }
 
     const deviceSubTabsEl = document.getElementById('deviceSubTabs');

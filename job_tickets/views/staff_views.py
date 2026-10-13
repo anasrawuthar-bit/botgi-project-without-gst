@@ -465,6 +465,21 @@ def staff_dashboard(request):
                         rack_obj = None
                         rack_col_val = None
 
+                # Check if device is linked to a previous job ticket
+                original_job_code = (request.POST.get(f'device_forms[{i}].original_job_code') or '').strip()
+                original_job_obj = None
+                if original_job_code:
+                    clean_orig = original_job_code.lstrip('#').strip()
+                    orig_qs = JobTicket.objects.all()
+                    if current_workspace:
+                        orig_qs = orig_qs.filter(Q(workspace=current_workspace) | Q(workspace__isnull=True))
+                    original_job_obj = orig_qs.filter(job_code__iexact=clean_orig).first()
+                    if not original_job_obj and clean_orig.isdigit():
+                        original_job_obj = orig_qs.filter(
+                            Q(job_code__iexact=f"JT-{clean_orig}") |
+                            Q(job_code__endswith=clean_orig)
+                        ).first()
+
                 device_submissions.append({
                     'device_type': device_type,
                     'device_brand': device_brand,
@@ -477,6 +492,7 @@ def staff_dashboard(request):
                     'requires_laptop_inspection_checklist': requires_laptop_inspection_checklist,
                     'rack': rack_obj,
                     'rack_column': rack_col_val,
+                    'original_job_ticket': original_job_obj,
                 })
                 device_photo_payloads.append(photo_files)
             i += 1
@@ -553,6 +569,8 @@ def staff_dashboard(request):
                             )
                 
                 created_details = f"Job ticket created for device: {device_data['device_type']}."
+                if device_data.get('original_job_ticket'):
+                    created_details += f" Linked to previous ticket #{device_data['original_job_ticket'].job_code}."
                 if parsed_job_date and parsed_job_date != timezone.localdate():
                     created_details += f" Intake date: {parsed_job_date.strftime('%d-%m-%Y')}."
                 if device_data.get('rack'):
@@ -584,6 +602,7 @@ def staff_dashboard(request):
                     'customer_phone': new_job.customer_phone,
                     'device_type': new_job.device_type,
                     'net_total': '0.00',
+                    'original_job_code': new_job.original_job_ticket.job_code if new_job.original_job_ticket else None,
                     'detail_url': reverse('staff_job_detail', args=[new_job.job_code]),
                     'receipt_url': reverse('job_creation_receipt_print', args=[new_job.job_code]),
                 })
@@ -685,7 +704,7 @@ def staff_dashboard(request):
             Q(customer_phone__icontains=query)
         )
         if current_workspace:
-            search_qs = search_qs.filter(workspace=current_workspace)
+            search_qs = search_qs.filter(Q(workspace=current_workspace) | Q(workspace__isnull=True))
         search_results = list(search_qs.select_related(
             'assigned_to__user'
         ).prefetch_related(
@@ -710,7 +729,7 @@ def staff_dashboard(request):
     else:
         job_tickets = JobTicket.objects.all().order_by('-created_at')
     if current_workspace:
-        job_tickets = job_tickets.filter(workspace=current_workspace)
+        job_tickets = job_tickets.filter(Q(workspace=current_workspace) | Q(workspace__isnull=True))
     # Defer large text fields not needed for dashboard listing
     job_tickets = job_tickets.defer('technician_notes', 'technician_checklist', 'feedback_followup_note')
     
@@ -868,7 +887,7 @@ def staff_dashboard_tab_partial(request):
     # Base tickets queryset scoped to workspace
     job_tickets = JobTicket.objects.all().order_by('-created_at')
     if current_workspace:
-        job_tickets = job_tickets.filter(workspace=current_workspace)
+        job_tickets = job_tickets.filter(Q(workspace=current_workspace) | Q(workspace__isnull=True))
     job_tickets = job_tickets.defer('technician_notes', 'technician_checklist', 'feedback_followup_note')
 
     def prepare_dashboard_jobs(qs):
@@ -894,7 +913,9 @@ def staff_dashboard_tab_partial(request):
 
     specialized_qs = SpecializedService.objects.filter(status='Awaiting Assignment')
     if current_workspace:
-        specialized_qs = specialized_qs.filter(job_ticket__workspace=current_workspace)
+        specialized_qs = specialized_qs.filter(
+            Q(job_ticket__workspace=current_workspace) | Q(job_ticket__workspace__isnull=True)
+        )
     specialized_count = specialized_qs.count()
 
     all_counts = {
@@ -1895,7 +1916,10 @@ def staff_job_detail(request, job_code):
     if denied:
         return denied
 
-    job = get_object_or_404(JobTicket.objects.prefetch_related('photos'), job_code=job_code)
+    job = get_object_or_404(
+        JobTicket.objects.select_related('original_job_ticket', 'rack', 'assigned_to__user', 'created_by').prefetch_related('photos'),
+        job_code=job_code
+    )
     if not user_has_workspace_access(request.user, job.workspace):
         return redirect('unauthorized')
     session = getattr(request, 'session', None)

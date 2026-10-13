@@ -670,6 +670,12 @@
                     <span class="data-label">Serial / IMEI:</span>
                     <span class="data-value">{{ job_ticket.device_serial|default:"N/A" }}</span>
                 </div>
+                {% if job_ticket.original_job_ticket %}
+                <div class="data-row">
+                    <span class="data-label">Prev Job #:</span>
+                    <span class="data-value"><strong style="color: #92400e;">#{{ job_ticket.original_job_ticket.job_code }}</strong>{% if job_ticket.original_job_ticket.created_at %} <span style="font-size: 10px; color: var(--ink-500);">({{ job_ticket.original_job_ticket.created_at|date:"d M Y" }})</span>{% endif %}</span>
+                </div>
+                {% endif %}
                 <div class="data-row">
                     <span class="data-label">Intake Date:</span>
                     <span class="data-value">{{ job_ticket.display_intake_date|date:"d M Y" }}</span>
@@ -717,6 +723,7 @@
                     <th>Job Code</th>
                     <th>Device &amp; Model</th>
                     <th>Serial Number</th>
+                    <th>Prev Job</th>
                     <th>Reported Issue</th>
                     <th>Accessories</th>
                 </tr>
@@ -727,6 +734,7 @@
                     <td><strong>{{ dev.job_code }}</strong></td>
                     <td>{{ dev.device_type }}<br><small>{{ dev.device_brand }} {{ dev.device_model }}</small></td>
                     <td>{{ dev.device_serial|default:"-" }}</td>
+                    <td>{% if dev.original_job_ticket %}<strong style="color: #92400e;">#{{ dev.original_job_ticket.job_code }}</strong>{% else %}<span style="color: #94a3b8;">-</span>{% endif %}</td>
                     <td>{{ dev.reported_issue }}</td>
                     <td>{{ dev.additional_items|default:"None" }}</td>
                 </tr>
@@ -821,6 +829,11 @@
                     <div>
                         <span class="workshop-tag-title">Workshop Device Tag</span> •
                         <strong style="font-size: 13px; font-family: monospace;">{{ dev.job_code }}</strong>
+                        {% if dev.original_job_ticket %}
+                        <span style="font-size: 9.5px; font-weight: 700; background: #fef3c7; color: #92400e; padding: 1px 5px; border-radius: 3px; border: 1px solid #fcd34d; margin-left: 5px;">
+                            Prev: #{{ dev.original_job_ticket.job_code }}
+                        </span>
+                        {% endif %}
                     </div>
                     <div>
                         <span style="font-size: 10px; color: var(--ink-500); font-weight: 600;">{{ dev.display_intake_date|date:"d M Y" }}</span>

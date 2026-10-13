@@ -150,6 +150,11 @@
             </a>
             <h1 class="section-title mb-0 fs-3">Job #{{ job.job_code }}</h1>
             <span class="badge badge-status badge-info">{{ job.get_status_display }}</span>
+            {% if job.original_job_ticket %}
+            <a href="{% url 'staff_job_detail' job.original_job_ticket.job_code %}" class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2.5 py-1 text-decoration-none" title="Linked to previous job ticket">
+                <i class="fas fa-history me-1"></i>Prev: #{{ job.original_job_ticket.job_code }}
+            </a>
+            {% endif %}
             {% if job.rack %}
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1">
                 <i class="fa-solid fa-boxes-stacked me-1"></i>{{ job.rack.name }} ({{ job.rack.group }})
@@ -317,6 +322,24 @@
                         {% endfor %}
                     </ul>
                     <small class="text-muted mt-2">These devices were submitted at the same time by the customer.</small>
+                </div>
+                {% endif %}
+
+                {% if job.original_job_ticket %}
+                <div class="card p-3 mb-4 mt-3 bg-light border-warning shadow-xs">
+                    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+                        <h6 class="mb-0 text-warning-emphasis fw-bold">
+                            <i class="fas fa-history text-warning me-1"></i> Repeat Service from Ticket #{{ job.original_job_ticket.job_code }}
+                        </h6>
+                        <a href="{% url 'staff_job_detail' job.original_job_ticket.job_code %}" class="btn btn-sm btn-outline-warning py-0.5 px-2.5 fw-semibold shadow-xs">
+                            View Previous Ticket <i class="fas fa-arrow-right ms-1"></i>
+                        </a>
+                    </div>
+                    <div class="small text-secondary">
+                        <div><strong>Device:</strong> {{ job.original_job_ticket.device_type }} ({{ job.original_job_ticket.device_brand }} {{ job.original_job_ticket.device_model }}) &bull; <strong>Serial:</strong> {{ job.original_job_ticket.device_serial|default:"N/A" }}</div>
+                        <div><strong>Previous Issue:</strong> {{ job.original_job_ticket.reported_issue }}</div>
+                        <div><strong>Intake Date:</strong> {{ job.original_job_ticket.display_intake_date|date:"d M Y" }} &bull; <strong>Previous Status:</strong> <span class="badge bg-secondary">{{ job.original_job_ticket.status }}</span></div>
+                    </div>
                 </div>
                 {% endif %}
 

@@ -156,6 +156,100 @@ def client_phone_lookup(request):
     snapshot = get_phone_service_snapshot(phone, workspace=workspace)
     return JsonResponse({'ok': True, **snapshot})
 
+
+@login_required
+def job_ticket_lookup(request):
+    """
+    Looks up a previous job ticket by job code or device serial number.
+    Returns customer info, device details, and any related batch devices for pre-filling.
+    """
+    if not request.user.is_staff or not user_has_staff_access(request.user, "staff_dashboard"):
+        return JsonResponse({'ok': False, 'message': 'Unauthorized'}, status=403)
+
+    raw_query = (request.GET.get('q') or request.GET.get('job_code') or '').strip()
+    if not raw_query:
+        return JsonResponse({'ok': True, 'found': False, 'message': 'Please enter a job ticket number or barcode.'})
+
+    clean_q = raw_query.lstrip('#').strip()
+    workspace = getattr(request, 'current_workspace', None)
+
+    qs = JobTicket.objects.all()
+    if workspace:
+        qs = qs.filter(Q(workspace=workspace) | Q(workspace__isnull=True))
+
+    # 1. Exact match on job_code
+    matched_job = qs.filter(job_code__iexact=clean_q).select_related('workspace', 'assigned_to__user', 'rack', 'original_job_ticket').first()
+
+    # 2. Try 'JT-' prefix or ending digits
+    if not matched_job and clean_q.isdigit():
+        matched_job = qs.filter(
+            Q(job_code__iexact=f"JT-{clean_q}") |
+            Q(job_code__endswith=clean_q)
+        ).select_related('workspace', 'assigned_to__user', 'rack', 'original_job_ticket').first()
+
+    # 3. Exact serial/IMEI match
+    if not matched_job and len(clean_q) >= 3:
+        matched_job = qs.filter(device_serial__iexact=clean_q).select_related('workspace', 'assigned_to__user', 'rack', 'original_job_ticket').first()
+
+    # 4. Partial job_code match
+    if not matched_job and len(clean_q) >= 2:
+        matched_job = qs.filter(job_code__icontains=clean_q).select_related('workspace', 'assigned_to__user', 'rack', 'original_job_ticket').first()
+
+    if not matched_job:
+        return JsonResponse({
+            'ok': True,
+            'found': False,
+            'message': f'No previous job ticket found matching "{raw_query}".',
+        })
+
+    # Retrieve all devices in the batch if grouped
+    batch_jobs = []
+    if matched_job.customer_group_id:
+        batch_qs = qs.filter(customer_group_id=matched_job.customer_group_id).select_related('assigned_to__user', 'rack', 'original_job_ticket').order_by('created_at', 'id')
+        batch_jobs = list(batch_qs)
+
+    if not batch_jobs:
+        batch_jobs = [matched_job]
+
+    def serialize_device(job_item):
+        return {
+            'id': job_item.id,
+            'job_code': job_item.job_code,
+            'device_type': job_item.device_type or '',
+            'device_brand': job_item.device_brand or '',
+            'device_model': job_item.device_model or '',
+            'device_serial': job_item.device_serial or '',
+            'device_password': job_item.device_password or '',
+            'reported_issue': job_item.reported_issue or '',
+            'additional_items': job_item.additional_items or '',
+            'status': job_item.status,
+            'is_under_warranty': job_item.is_under_warranty,
+            'created_at': job_item.created_at.strftime('%d-%m-%Y') if job_item.created_at else '',
+            'intake_date': job_item.intake_date.strftime('%d-%m-%Y') if job_item.intake_date else (job_item.created_at.strftime('%d-%m-%Y') if job_item.created_at else ''),
+            'closed_at': job_item.closed_at.strftime('%d-%m-%Y') if job_item.closed_at else '',
+            'technician': (job_item.assigned_to.user.get_full_name() or job_item.assigned_to.user.username) if job_item.assigned_to else '',
+        }
+
+    primary_device_data = serialize_device(matched_job)
+    batch_devices_data = [serialize_device(j) for j in batch_jobs]
+
+    phone_snapshot = get_phone_service_snapshot(matched_job.customer_phone, workspace=workspace)
+
+    return JsonResponse({
+        'ok': True,
+        'found': True,
+        'matched_job_code': matched_job.job_code,
+        'customer_name': matched_job.customer_name,
+        'customer_phone': matched_job.customer_phone,
+        'total_jobs': phone_snapshot.get('total_jobs', 1),
+        'open_jobs': phone_snapshot.get('open_jobs', 0),
+        'outstanding_balance': phone_snapshot.get('outstanding_balance', '0.00'),
+        'primary_device': primary_device_data,
+        'batch_devices': batch_devices_data,
+        'is_batch': len(batch_devices_data) > 1,
+    })
+
+
 def client_bill_view(request, job_code):
     job_ticket = get_object_or_404(
         JobTicket.objects.select_related('workspace', 'assigned_to__user', 'created_by', 'rack'),
@@ -267,7 +361,7 @@ def job_creation_receipt_print_view(request, job_code):
     if denied:
         return denied
     job_ticket = get_object_or_404(
-        JobTicket.objects.select_related('rack', 'assigned_to__user', 'created_by'),
+        JobTicket.objects.select_related('rack', 'assigned_to__user', 'created_by', 'original_job_ticket'),
         job_code=job_code,
     )
 
@@ -275,7 +369,7 @@ def job_creation_receipt_print_view(request, job_code):
         grouped_jobs = list(JobTicket.objects.filter(
             workspace_id=job_ticket.workspace_id,
             customer_group_id=job_ticket.customer_group_id,
-        ).select_related('rack', 'assigned_to__user').order_by('created_at'))
+        ).select_related('rack', 'assigned_to__user', 'original_job_ticket').order_by('created_at'))
     else:
         grouped_jobs = [job_ticket]
 
@@ -305,7 +399,7 @@ def job_creation_receipt_print_view(request, job_code):
 
 def job_creation_receipt_public_view(request, job_code):
     job_ticket = get_object_or_404(
-        JobTicket.objects.select_related('rack', 'assigned_to__user', 'created_by'),
+        JobTicket.objects.select_related('rack', 'assigned_to__user', 'created_by', 'original_job_ticket'),
         job_code=job_code,
     )
     token = (request.GET.get('token') or '').strip()
@@ -316,7 +410,7 @@ def job_creation_receipt_public_view(request, job_code):
         grouped_jobs = list(JobTicket.objects.filter(
             workspace_id=job_ticket.workspace_id,
             customer_group_id=job_ticket.customer_group_id,
-        ).select_related('rack', 'assigned_to__user').order_by('created_at'))
+        ).select_related('rack', 'assigned_to__user', 'original_job_ticket').order_by('created_at'))
     else:
         grouped_jobs = [job_ticket]
 

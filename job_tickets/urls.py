@@ -90,6 +90,7 @@ urlpatterns = [
     path('download/technician-app/', views.download_technician_app, name='download_technician_app'),
     path('technician-app/', views.technician_app_landing, name='technician_app_landing'),
     path('api/client-phone-lookup/', views.client_phone_lookup, name='client_phone_lookup'),
+    path('api/job-ticket-lookup/', views.job_ticket_lookup, name='job_ticket_lookup'),
     path('api/mobile/login/', views.mobile_api_login, name='mobile_api_login'),
     path('api/mobile/qr-login/', views.mobile_api_qr_login, name='mobile_api_qr_login'),
     path('api/auth/qr-token/status/<str:token>/', views.qr_login_token_status, name='qr_login_token_status'),
