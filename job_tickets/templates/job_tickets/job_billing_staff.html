@@ -700,15 +700,22 @@
 <template id="inline-product-row-template">
     <tr class="product-sale-row-inline">
         <td>
-            <div class="product-picker-container">
-                <select name="product_id[]" class="form-select form-select-sm product-select editable-product-field" style="background-color: #fffbe6;" required>
+            <div class="product-picker-container position-relative">
+                <input type="text"
+                       class="form-control form-control-sm job-billing-product-picker editable-product-field"
+                       placeholder="Scan barcode or type item name..."
+                       autocomplete="off"
+                       style="background-color: #fffbe6;">
+                <select name="product_id[]" class="d-none product-select editable-product-field">
                     <option value="">-- Choose Product / Spare Part --</option>
                     {% for product in products_for_sale %}
                         <option value="{{ product.id }}"
                                 data-price="{{ product.unit_price }}"
                                 data-cost="{{ product.cost_price|default:0 }}"
                                 data-stock="{{ product.stock_quantity }}"
-                                data-sku="{{ product.sku|default:'' }}">
+                                data-sku="{{ product.sku|default:'' }}"
+                                data-category="{{ product.category|default:'' }}"
+                                data-brand="{{ product.brand|default:'' }}">
                             {{ product.name }} (Stock: {{ product.stock_quantity }})
                         </option>
                     {% endfor %}
@@ -924,6 +931,71 @@
             </div>
         </div>
     </div>
+
+    <!-- Quick Add Product Modal -->
+    <div class="modal fade" id="quickAddProductModal" tabindex="-1" aria-labelledby="quickAddProductModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-bottom py-3 px-4 bg-white">
+                    <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2" id="quickAddProductModalLabel">
+                        <i class="fas fa-box-open text-primary"></i>Add New Product
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="quick-product-name" class="form-label small fw-semibold mb-1">Product Name <span class="text-danger">*</span></label>
+                            <input type="text" id="quick-product-name" class="form-control" placeholder="Enter product name" autocomplete="off" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label for="quick-product-sku" class="form-label small fw-semibold mb-1">SKU / Barcode</label>
+                            <input type="text" id="quick-product-sku" class="form-control font-monospace" placeholder="Optional barcode / SKU" autocomplete="off">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quick-product-category" class="form-label small fw-semibold mb-1">Category</label>
+                            <input type="text" id="quick-product-category" class="form-control" list="quick-product-category-datalist" placeholder="Select or type category" autocomplete="off">
+                            <datalist id="quick-product-category-datalist">
+                                {% for cat in item_categories %}
+                                    <option value="{{ cat.name }}">
+                                {% endfor %}
+                            </datalist>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quick-product-brand" class="form-label small fw-semibold mb-1">Brand</label>
+                            <input type="text" id="quick-product-brand" class="form-control" placeholder="Optional brand">
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quick-product-cost-price" class="form-label small fw-semibold mb-1">Purchase / Cost Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">₹</span>
+                                <input type="number" min="0" step="0.01" id="quick-product-cost-price" class="form-control font-monospace" value="0.00" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quick-product-unit-price" class="form-label small fw-semibold mb-1">Selling Price</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light">₹</span>
+                                <input type="number" min="0" step="0.01" id="quick-product-unit-price" class="form-control font-monospace" value="0.00" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="quick-product-bin-location" class="form-label small fw-semibold mb-1">Rack / Bin Location</label>
+                            <input type="text" id="quick-product-bin-location" class="form-control" placeholder="e.g. Rack A-02">
+                        </div>
+                    </div>
+                    <div id="quick-product-errors" class="alert alert-danger py-2 px-3 mt-3 mb-0 d-none"></div>
+                </div>
+                <div class="modal-footer border-top py-2 px-4 bg-light">
+                    <button type="button" id="cancel-quick-product-btn" class="btn btn-outline-secondary btn-sm px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="save-quick-product-btn" class="btn btn-primary btn-sm px-3 fw-medium">
+                        <i class="fas fa-save me-1"></i>Save Product
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // ----------------------------------------------------
@@ -1102,7 +1174,12 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function clearInlineProductRows() {
-        document.querySelectorAll('.product-sale-row-inline').forEach(row => row.remove());
+        document.querySelectorAll('.product-sale-row-inline').forEach(row => {
+            if (row._pickerController && typeof row._pickerController.destroy === 'function') {
+                row._pickerController.destroy();
+            }
+            row.remove();
+        });
     }
 
     function renderPendingUndoList() {
@@ -1448,11 +1525,492 @@ document.addEventListener('DOMContentLoaded', function() {
         return select && select.value && Number.isFinite(qty) && qty > 0;
     }
 
+    // ----------------------------------------------------
+    // Product Autocomplete & Quick Add Product Handlers
+    // ----------------------------------------------------
+    let activeProductRowForQuickAdd = null;
+    const quickProductModalEl = document.getElementById('quickAddProductModal');
+    let quickProductModalInstance = null;
+    const saveQuickProductBtn = document.getElementById('save-quick-product-btn');
+    const quickProductErrors = document.getElementById('quick-product-errors');
+
+    function getQuickProductModal() {
+        if (!quickProductModalInstance && quickProductModalEl && typeof bootstrap !== 'undefined') {
+            quickProductModalInstance = bootstrap.Modal.getOrCreateInstance(quickProductModalEl);
+        }
+        return quickProductModalInstance;
+    }
+
+    function openQuickProductModal(initialQuery = '', invokingRow = null) {
+        activeProductRowForQuickAdd = invokingRow || null;
+        if (quickProductErrors) {
+            quickProductErrors.classList.add('d-none');
+            quickProductErrors.textContent = '';
+        }
+        const nameInput = document.getElementById('quick-product-name');
+        if (nameInput) nameInput.value = initialQuery || '';
+        const skuInput = document.getElementById('quick-product-sku');
+        if (skuInput) skuInput.value = '';
+        const catInput = document.getElementById('quick-product-category');
+        if (catInput) catInput.value = '';
+        const brandInput = document.getElementById('quick-product-brand');
+        if (brandInput) brandInput.value = '';
+        const costInput = document.getElementById('quick-product-cost-price');
+        if (costInput) costInput.value = '0.00';
+        const unitInput = document.getElementById('quick-product-unit-price');
+        if (unitInput) unitInput.value = '0.00';
+        const binInput = document.getElementById('quick-product-bin-location');
+        if (binInput) binInput.value = '';
+
+        const modal = getQuickProductModal();
+        if (modal) modal.show();
+        setTimeout(() => {
+            if (nameInput) {
+                nameInput.focus();
+                if (initialQuery) nameInput.select();
+            }
+        }, 200);
+    }
+
+    if (saveQuickProductBtn) {
+        saveQuickProductBtn.addEventListener('click', async function() {
+            const name = document.getElementById('quick-product-name')?.value.trim();
+            if (!name) {
+                if (quickProductErrors) {
+                    quickProductErrors.textContent = 'Product name is required.';
+                    quickProductErrors.classList.remove('d-none');
+                }
+                return;
+            }
+
+            saveQuickProductBtn.disabled = true;
+            saveQuickProductBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Saving...';
+
+            const formData = new FormData();
+            formData.append('name', name);
+            formData.append('sku', document.getElementById('quick-product-sku')?.value.trim() || '');
+            formData.append('category', document.getElementById('quick-product-category')?.value.trim() || '');
+            formData.append('brand', document.getElementById('quick-product-brand')?.value.trim() || '');
+            formData.append('cost_price', document.getElementById('quick-product-cost-price')?.value.trim() || '0.00');
+            formData.append('unit_price', document.getElementById('quick-product-unit-price')?.value.trim() || '0.00');
+            formData.append('bin_location', document.getElementById('quick-product-bin-location')?.value.trim() || '');
+
+            const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value || '';
+
+            try {
+                const response = await fetch("{% url 'inventory_quick_add_product' %}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+                const data = await response.json();
+                if (!response.ok || !data.ok) {
+                    const errs = data.errors || [data.error || 'Failed to save product.'];
+                    if (quickProductErrors) {
+                        quickProductErrors.textContent = errs.join(' ');
+                        quickProductErrors.classList.remove('d-none');
+                    }
+                    return;
+                }
+
+                // Success!
+                const newProd = data.product;
+                const modal = getQuickProductModal();
+                if (modal) modal.hide();
+
+                // Append new option to template select
+                const tpl = document.getElementById('inline-product-row-template');
+                if (tpl) {
+                    const tplSelect = tpl.content.querySelector('.product-select');
+                    if (tplSelect) {
+                        const opt = document.createElement('option');
+                        opt.value = newProd.id;
+                        opt.textContent = `${newProd.name} (Stock: ${newProd.stock_quantity || 0})`;
+                        opt.dataset.price = newProd.unit_price || 0;
+                        opt.dataset.cost = newProd.cost_price || 0;
+                        opt.dataset.stock = newProd.stock_quantity || 0;
+                        opt.dataset.sku = newProd.sku || '';
+                        opt.dataset.category = newProd.category || '';
+                        opt.dataset.brand = newProd.brand || '';
+                        tplSelect.appendChild(opt);
+                    }
+                }
+
+                // Append option to all current row selects
+                document.querySelectorAll('.product-sale-row-inline .product-select').forEach((sel) => {
+                    const opt = document.createElement('option');
+                    opt.value = newProd.id;
+                    opt.textContent = `${newProd.name} (Stock: ${newProd.stock_quantity || 0})`;
+                    opt.dataset.price = newProd.unit_price || 0;
+                    opt.dataset.cost = newProd.cost_price || 0;
+                    opt.dataset.stock = newProd.stock_quantity || 0;
+                    opt.dataset.sku = newProd.sku || '';
+                    opt.dataset.category = newProd.category || '';
+                    opt.dataset.brand = newProd.brand || '';
+                    sel.appendChild(opt);
+                });
+
+                // If invoking row exists, select the new product in it
+                if (activeProductRowForQuickAdd) {
+                    const sel = activeProductRowForQuickAdd.querySelector('.product-select');
+                    const picker = activeProductRowForQuickAdd.querySelector('.job-billing-product-picker');
+                    if (sel) sel.value = String(newProd.id);
+                    if (picker) picker.value = newProd.name;
+                    if (activeProductRowForQuickAdd._pickerController) {
+                        activeProductRowForQuickAdd._pickerController.refreshOptions();
+                    }
+                    if (sel) sel.dispatchEvent(new Event('change', { bubbles: true }));
+                    const qtyInput = activeProductRowForQuickAdd.querySelector('.product-qty');
+                    if (qtyInput) {
+                        qtyInput.focus();
+                        qtyInput.select();
+                    }
+                }
+            } catch (err) {
+                if (quickProductErrors) {
+                    quickProductErrors.textContent = 'Server communication error. Please try again.';
+                    quickProductErrors.classList.remove('d-none');
+                }
+            } finally {
+                saveQuickProductBtn.disabled = false;
+                saveQuickProductBtn.innerHTML = '<i class="fas fa-save me-1"></i>Save Product';
+            }
+        });
+    }
+
+    function createJobBillingProductPicker(pickerInput, selectInput, rowNode) {
+        if (!pickerInput || !selectInput) return null;
+
+        const allOptions = [];
+        let currentMatches = [];
+        let highlightedIndex = -1;
+        let hasExactMatch = false;
+
+        // Create floating dropdown container
+        const menu = document.createElement('div');
+        menu.className = 'erp-autocomplete-dropdown';
+        menu.style.display = 'none';
+        document.body.appendChild(menu);
+
+        function updateDropdownPosition() {
+            if (menu.style.display === 'none') return;
+            const rect = pickerInput.getBoundingClientRect();
+            if (rect.width === 0 && rect.height === 0) {
+                hideDropdown();
+                return;
+            }
+            const width = Math.max(rect.width, 420);
+            menu.style.position = 'fixed';
+            menu.style.width = `${width}px`;
+            menu.style.zIndex = '10055';
+
+            let left = rect.left;
+            if (left + width > window.innerWidth - 12) {
+                left = Math.max(10, window.innerWidth - width - 12);
+            }
+            menu.style.left = `${left}px`;
+
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            if (spaceBelow < 280 && spaceAbove > spaceBelow) {
+                menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+                menu.style.top = 'auto';
+            } else {
+                menu.style.top = `${rect.bottom + 4}px`;
+                menu.style.bottom = 'auto';
+            }
+        }
+
+        function showDropdown() {
+            if (pickerInput.disabled || pickerInput.readOnly) return;
+            syncAllOptionsFromSelect();
+            renderSuggestions(pickerInput.value);
+            menu.style.display = 'block';
+            updateDropdownPosition();
+        }
+
+        function hideDropdown() {
+            menu.style.display = 'none';
+            highlightedIndex = -1;
+        }
+
+        function syncAllOptionsFromSelect() {
+            allOptions.length = 0;
+            Array.from(selectInput.options)
+                .filter((opt) => opt.value)
+                .forEach((opt) => {
+                    const rawText = (opt.textContent || '').trim();
+                    const cleanName = rawText.replace(/\s*\(Stock:\s*\d+\)$/i, '').trim() || rawText;
+                    allOptions.push({
+                        value: String(opt.value),
+                        label: cleanName,
+                        sku: opt.dataset.sku || '',
+                        stock: parseInt(opt.dataset.stock || '0', 10),
+                        cost: parseFloat(opt.dataset.cost || 0),
+                        price: parseFloat(opt.dataset.price || 0),
+                        category: opt.dataset.category || '',
+                        brand: opt.dataset.brand || '',
+                        disabled: opt.disabled,
+                    });
+                });
+            allOptions.sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        function normalizeStr(str) {
+            return (str || '').toString().toLowerCase().trim().replace(/\s+/g, ' ');
+        }
+
+        function renderSuggestions(queryText) {
+            const rawQuery = String(queryText || '').trim();
+            const query = normalizeStr(rawQuery);
+
+            hasExactMatch = Boolean(query && allOptions.some((opt) => normalizeStr(opt.label) === query || (opt.sku && normalizeStr(opt.sku) === query)));
+
+            const matches = allOptions.filter((opt) => {
+                if (!query) return true;
+                const labelMatch = normalizeStr(opt.label).includes(query);
+                const skuMatch = opt.sku && normalizeStr(opt.sku).includes(query);
+                const catMatch = opt.category && normalizeStr(opt.category).includes(query);
+                return labelMatch || skuMatch || catMatch;
+            });
+
+            currentMatches = matches;
+            const canAddNew = !hasExactMatch;
+            highlightedIndex = matches.length > 0 ? 0 : (canAddNew ? 0 : -1);
+
+            let html = '';
+            if (matches.length > 0) {
+                html += '<div class="erp-autocomplete-list">';
+                matches.slice(0, 30).forEach((opt, idx) => {
+                    const isSelected = String(selectInput.value || '') === String(opt.value);
+                    const stock = opt.stock || 0;
+                    const stockBadge = stock > 0
+                        ? `<span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">${stock} in stock</span>`
+                        : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">0 in stock</span>`;
+
+                    html += `
+                        <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}">
+                            <div class="d-flex align-items-center justify-content-between gap-2">
+                                <div class="text-truncate">
+                                    <div class="fw-semibold text-dark text-truncate">${escapeHtml(opt.label)}</div>
+                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.74rem;">
+                                        ${opt.sku ? `<span class="font-monospace text-secondary"><i class="fas fa-barcode me-1 text-muted"></i>${escapeHtml(opt.sku)}</span>` : ''}
+                                        ${stockBadge}
+                                        ${opt.category ? `<span class="badge bg-light text-secondary border">${escapeHtml(opt.category)}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="text-end flex-shrink-0">
+                                    <div class="fw-bold font-monospace text-success">₹ ${Number(opt.price).toFixed(2)}</div>
+                                    <div class="text-muted" style="font-size: 0.7rem;">Selling</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+            } else {
+                html += `
+                    <div class="erp-autocomplete-empty">
+                        <i class="fas fa-search me-1 opacity-50"></i>No products found matching "<strong>${escapeHtml(rawQuery)}</strong>"
+                    </div>
+                `;
+            }
+
+            if (canAddNew) {
+                const queryLabel = rawQuery ? `"${escapeHtml(rawQuery)}"` : 'New Product';
+                html += `
+                    <div class="erp-autocomplete-footer">
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100 text-start d-flex align-items-center justify-content-between erp-btn-add-new-from-dropdown">
+                            <span><i class="fas fa-plus-circle me-1"></i>Add <strong>${queryLabel}</strong> as New Product</span>
+                            <span class="badge bg-primary text-white font-monospace">Add</span>
+                        </button>
+                    </div>
+                `;
+            }
+
+            menu.innerHTML = html;
+            updateDropdownPosition();
+            return matches;
+        }
+
+        function selectOption(optionData) {
+            if (!optionData) return;
+            selectInput.value = optionData.value;
+            pickerInput.value = optionData.label;
+            hideDropdown();
+            selectInput.dispatchEvent(new Event('change', { bubbles: true }));
+
+            // Smooth focus to quantity input
+            const qtyInput = rowNode.querySelector('.product-qty');
+            if (qtyInput) {
+                qtyInput.focus();
+                qtyInput.select();
+            }
+        }
+
+        function updateHighlightVisuals() {
+            const items = menu.querySelectorAll('.erp-autocomplete-item');
+            items.forEach((el, idx) => {
+                el.classList.toggle('active', idx === highlightedIndex);
+                if (idx === highlightedIndex) {
+                    el.scrollIntoView({ block: 'nearest' });
+                }
+            });
+            const addNewBtn = menu.querySelector('.erp-btn-add-new-from-dropdown');
+            if (addNewBtn) {
+                const isBtnActive = highlightedIndex === currentMatches.length;
+                addNewBtn.classList.toggle('btn-primary', isBtnActive);
+                addNewBtn.classList.toggle('text-white', isBtnActive);
+                addNewBtn.classList.toggle('btn-outline-primary', !isBtnActive);
+                if (isBtnActive) {
+                    addNewBtn.scrollIntoView({ block: 'nearest' });
+                }
+            }
+        }
+
+        function syncSelectFromPicker(isStrict) {
+            const rawText = pickerInput.value || '';
+            const query = normalizeStr(rawText);
+            if (!query) {
+                selectInput.value = '';
+                selectInput.dispatchEvent(new Event('change', { bubbles: true }));
+                return;
+            }
+            // 1. Exact match on SKU (barcode gun scan)
+            const exactSkuMatch = allOptions.find((opt) => opt.sku && normalizeStr(opt.sku) === query);
+            if (exactSkuMatch) {
+                selectOption(exactSkuMatch);
+                return;
+            }
+            // 2. Exact match on Label
+            const exactMatch = allOptions.find((opt) => normalizeStr(opt.label) === query);
+            if (exactMatch) {
+                selectOption(exactMatch);
+                return;
+            }
+            if (isStrict) {
+                const currentOpt = allOptions.find((o) => o.value === selectInput.value);
+                if (currentOpt && query && (normalizeStr(currentOpt.label) === query || normalizeStr(currentOpt.label).includes(query))) {
+                    pickerInput.value = currentOpt.label;
+                    return;
+                }
+                selectInput.value = '';
+                selectInput.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        // Event listeners
+        pickerInput.addEventListener('focus', showDropdown);
+        pickerInput.addEventListener('input', () => {
+            showDropdown();
+            syncSelectFromPicker(false);
+        });
+        pickerInput.addEventListener('change', () => {
+            syncSelectFromPicker(true);
+        });
+
+        pickerInput.addEventListener('keydown', (event) => {
+            const canAddNew = !hasExactMatch;
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (menu.style.display === 'none') {
+                    showDropdown();
+                    return;
+                }
+                const maxIdx = canAddNew ? currentMatches.length : Math.max(0, currentMatches.length - 1);
+                highlightedIndex = Math.min(highlightedIndex + 1, maxIdx);
+                updateHighlightVisuals();
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (menu.style.display !== 'none') {
+                    highlightedIndex = Math.max(highlightedIndex - 1, 0);
+                    updateHighlightVisuals();
+                }
+            } else if (event.key === 'Enter') {
+                if (menu.style.display !== 'none') {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (highlightedIndex >= 0 && highlightedIndex < currentMatches.length) {
+                        selectOption(currentMatches[highlightedIndex]);
+                    } else if (canAddNew && (highlightedIndex === currentMatches.length || currentMatches.length === 0)) {
+                        const q = pickerInput.value.trim();
+                        hideDropdown();
+                        openQuickProductModal(q, rowNode);
+                    } else if (currentMatches.length === 1) {
+                        selectOption(currentMatches[0]);
+                    } else {
+                        hideDropdown();
+                    }
+                }
+            } else if (event.key === 'Escape') {
+                hideDropdown();
+            }
+        });
+
+        menu.addEventListener('mousedown', (event) => {
+            event.preventDefault(); // Prevent pickerInput from losing focus
+            const item = event.target.closest('.erp-autocomplete-item');
+            if (item) {
+                const idx = parseInt(item.dataset.index, 10);
+                if (currentMatches[idx]) {
+                    selectOption(currentMatches[idx]);
+                }
+                return;
+            }
+            const addBtn = event.target.closest('.erp-btn-add-new-from-dropdown');
+            if (addBtn) {
+                const q = pickerInput.value.trim();
+                hideDropdown();
+                openQuickProductModal(q, rowNode);
+            }
+        });
+
+        function onDocClick(event) {
+            if (event.target !== pickerInput && !menu.contains(event.target)) {
+                hideDropdown();
+            }
+        }
+
+        window.addEventListener('scroll', updateDropdownPosition, true);
+        window.addEventListener('resize', updateDropdownPosition);
+        document.addEventListener('click', onDocClick);
+
+        // Initial setup
+        syncAllOptionsFromSelect();
+
+        return {
+            show: showDropdown,
+            hide: hideDropdown,
+            refreshOptions: function() {
+                syncAllOptionsFromSelect();
+            },
+            setSelected: function(opt) {
+                selectOption(opt);
+            },
+            destroy: function() {
+                window.removeEventListener('scroll', updateDropdownPosition, true);
+                window.removeEventListener('resize', updateDropdownPosition);
+                document.removeEventListener('click', onDocClick);
+                if (menu && menu.parentNode) {
+                    menu.parentNode.removeChild(menu);
+                }
+            }
+        };
+    }
+
     function bindInlineProductRowEvents(rowNode) {
         const select = rowNode.querySelector('.product-select');
+        const pickerInput = rowNode.querySelector('.job-billing-product-picker');
         const unitPriceInput = rowNode.querySelector('.product-unit-price-input');
         const qtyInput = rowNode.querySelector('.product-qty');
         const removeBtn = rowNode.querySelector('.remove-product-btn');
+
+        if (pickerInput && select) {
+            rowNode._pickerController = createJobBillingProductPicker(pickerInput, select, rowNode);
+        }
 
         if (select) {
             select.addEventListener('change', function() {
@@ -1478,6 +2036,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (removeBtn) {
             removeBtn.addEventListener('click', function() {
+                if (rowNode._pickerController && typeof rowNode._pickerController.destroy === 'function') {
+                    rowNode._pickerController.destroy();
+                }
                 rowNode.remove();
                 calculateTotals();
             });
@@ -1510,8 +2071,13 @@ document.addEventListener('DOMContentLoaded', function() {
         updateProductRow(rowNode);
         calculateTotals();
 
-        const select = rowNode.querySelector('.product-select');
-        if (select) select.focus();
+        const pickerInput = rowNode.querySelector('.job-billing-product-picker');
+        if (pickerInput) {
+            pickerInput.focus();
+        } else {
+            const select = rowNode.querySelector('.product-select');
+            if (select) select.focus();
+        }
     }
 
     function addServiceRowAction() {
@@ -1644,7 +2210,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (!select || !select.value) {
                     e.preventDefault();
                     showWarning('Please select a product for all added spare parts / product rows.');
-                    if (select) select.focus();
+                    const picker = row.querySelector('.job-billing-product-picker');
+                    if (picker) picker.focus();
+                    else if (select) select.focus();
                     return;
                 }
                 if (!Number.isFinite(qty) || qty <= 0) {

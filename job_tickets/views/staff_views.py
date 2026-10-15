@@ -1523,6 +1523,12 @@ def job_billing_staff(request, job_code):
         products_qs = products_qs.filter(workspace=job.workspace)
     products_for_sale = products_qs.order_by('name')
 
+    from ..models import ItemCategory
+    item_cats_qs = ItemCategory.objects.all()
+    if job.workspace:
+        item_cats_qs = item_cats_qs.filter(workspace=job.workspace)
+    item_categories = item_cats_qs.order_by('name')
+
     job_expenses = job.expenses.all().select_related('recorded_by').order_by('-expense_date', '-id')
     job_expenses_total = job_expenses.aggregate(total=Coalesce(Sum('amount'), Decimal('0.00')))['total']
     
@@ -1532,6 +1538,7 @@ def job_billing_staff(request, job_code):
         'pure_service_logs': pure_service_logs,
         'existing_product_sales': existing_product_sales,
         'products_for_sale': products_for_sale,
+        'item_categories': item_categories,
         'total_parts_cost': job.part_total,
         'total_service_charges': job.service_total,
         'subtotal': subtotal,

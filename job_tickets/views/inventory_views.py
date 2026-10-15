@@ -681,7 +681,7 @@ def inventory_invoice_preview(request):
 @login_required
 @require_POST
 def inventory_quick_add_product(request):
-    if not request.user.is_staff or not user_has_staff_access(request.user, "inventory"):
+    if not request.user.is_staff or not (user_has_staff_access(request.user, "inventory") or user_has_staff_access(request.user, "staff_dashboard")):
         return JsonResponse({'ok': False, 'error': 'Unauthorized'}, status=403)
 
     payload = request.POST.copy()

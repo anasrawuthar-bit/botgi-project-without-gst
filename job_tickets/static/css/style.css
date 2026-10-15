@@ -663,6 +663,59 @@ h6,
     background-color: #ffffff;
 }
 
+/* ── ERP Custom Autocomplete Dropdown ────────────────────────── */
+.erp-autocomplete-dropdown {
+    position: fixed;
+    z-index: 10055;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.18), 0 8px 10px -6px rgba(15, 23, 42, 0.08);
+    max-height: 290px;
+    overflow-y: auto;
+    font-size: 0.83rem;
+    animation: erpDropdownFadeIn 0.12s ease-out;
+}
+@keyframes erpDropdownFadeIn {
+    from { opacity: 0; transform: translateY(-3px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.erp-autocomplete-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.12s ease;
+}
+.erp-autocomplete-item:hover,
+.erp-autocomplete-item.active {
+    background-color: #f0f7ff;
+}
+.erp-autocomplete-item.selected {
+    background-color: #f8fafc;
+}
+.erp-autocomplete-item:last-child {
+    border-bottom: none;
+}
+.erp-autocomplete-empty {
+    padding: 16px;
+    text-align: center;
+    color: #64748b;
+    font-size: 0.82rem;
+}
+.erp-autocomplete-footer {
+    position: sticky;
+    bottom: 0;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    padding: 6px 8px;
+    z-index: 5;
+}
+.erp-autocomplete-footer button {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+
 .form-check-input {
     border-color: #cbd5e1;
     border-radius: 4px;
