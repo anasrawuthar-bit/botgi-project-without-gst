@@ -118,7 +118,6 @@
             <p class="small text-muted mb-0">
                 {% if profile.address %}{{ profile.address }} &middot; {% endif %}
                 Phone: {{ profile.phone1|default:"N/A" }}{% if profile.phone2 %}, {{ profile.phone2 }}{% endif %}
-                {% if profile.gstin %} &middot; GSTIN: <strong>{{ profile.gstin }}</strong>{% endif %}
             </p>
         </div>
         <div class="text-end">

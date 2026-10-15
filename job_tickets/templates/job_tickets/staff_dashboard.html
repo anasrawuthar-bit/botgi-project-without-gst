@@ -291,7 +291,7 @@
     <!-- 2. Command & Search Bar -->
     <div class="card border-0 shadow-sm rounded-3 mb-4" style="border: 1px solid var(--border-color) !important;">
         <div class="card-body p-2 p-md-3">
-            <form method="get" class="d-flex align-items-center gap-2 flex-wrap flex-md-nowrap">
+            <form method="get" class="d-flex align-items-center gap-2 flex-wrap flex-md-nowrap" autocomplete="off">
                 <div class="input-group">
                     <span class="input-group-text bg-transparent border-end-0 text-muted ps-3">
                         <i class="fa-solid fa-magnifying-glass"></i>
@@ -437,7 +437,7 @@
                 </button>
             </div>
             <div class="card-body p-3 p-md-3.5 bg-white">
-                <form method="post" novalidate id="job-creation-form" 
+                <form method="post" novalidate id="job-creation-form" autocomplete="off"
                     data-phone-lookup-url="{% url 'client_phone_lookup' %}"
                     data-job-lookup-url="{% url 'job_ticket_lookup' %}"
                     enctype="multipart/form-data"
@@ -453,15 +453,15 @@
                         <!-- STEP 1: CUSTOMER INFORMATION -->
                         <div class="tab-pane fade show active" id="intake-step-customer" role="tabpanel" aria-labelledby="step-customer-tab">
 
-                            <!-- Repeat Device / Old Job # Barcode Search -->
+                            <!-- Old Job # Search -->
                             <div class="p-2.5 mb-3 rounded-3 border bg-light d-flex flex-wrap align-items-center justify-content-between gap-2" style="border-left: 4px solid #3b82f6 !important;">
                                 <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 520px;">
                                     <span class="small fw-bold text-dark text-nowrap">
-                                        <i class="fas fa-barcode text-primary me-1"></i> Repeat Device / Old Job #:
+                                        <i class="fas fa-history text-primary me-1"></i> Old Job #:
                                     </span>
                                     <div class="input-group input-group-sm flex-nowrap">
                                         <input type="text" id="lookup_old_job_input" class="form-control"
-                                            placeholder="Enter Job # (e.g. 1042) or scan barcode" autocomplete="off"
+                                            placeholder="Enter Job # (e.g. 1042)" autocomplete="off"
                                             style="font-family: monospace; font-weight: 600;">
                                         <button type="button" class="btn btn-primary px-3 fw-semibold d-inline-flex align-items-center gap-1" id="btn_lookup_old_job">
                                             <i class="fas fa-search"></i> <span>Find</span>
@@ -581,10 +581,10 @@
                                     </label>
                                     <div class="input-group input-group-sm">
                                         <input type="number" name="reminder_hours" id="id_reminder_hours"
-                                            class="form-control" min="0" max="24" placeholder="0" inputmode="numeric">
+                                            class="form-control" min="0" max="23" placeholder="0" inputmode="numeric" title="Max 23 hours">
                                         <span class="input-group-text bg-light text-muted small">hr</span>
                                         <input type="number" name="reminder_minutes" id="id_reminder_minutes"
-                                            class="form-control" min="0" max="60" placeholder="0" inputmode="numeric">
+                                            class="form-control" min="0" max="59" placeholder="0" inputmode="numeric" title="Max 59 minutes">
                                         <span class="input-group-text bg-light text-muted small">min</span>
                                     </div>
                                 </div>
@@ -701,7 +701,7 @@
     <div class="modal fade" id="assignJobModal" tabindex="-1" aria-labelledby="assignJobModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <form method="post" id="assign-job-form">
+                <form method="post" id="assign-job-form" autocomplete="off">
                     {% csrf_token %}
                     <input type="hidden" name="assign_job_form_submit" value="true">
                     <input type="hidden" name="job_code" id="assign_job_code_input" value="">
@@ -762,7 +762,7 @@
                         </button>
                         <div class="device-link-old-job-input-box d-none mt-1">
                             <div class="input-group input-group-sm" style="max-width: 320px;">
-                                <input type="text" class="form-control form-control-sm device-old-job-query-input" placeholder="e.g. 1042 or scan barcode" style="font-family: monospace;">
+                                <input type="text" class="form-control form-control-sm device-old-job-query-input" placeholder="e.g. 1042" style="font-family: monospace;">
                                 <button type="button" class="btn btn-outline-primary btn-sm device-old-job-fetch-btn py-0 px-2.5" style="font-size: 0.78rem;">
                                     <i class="fas fa-search me-1"></i> Fetch
                                 </button>
@@ -1057,7 +1057,7 @@
 <div class="modal fade" id="dashboardCloseJobModal" tabindex="-1" aria-labelledby="dashboardCloseJobModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="post" id="dashboard-close-job-form">
+            <form method="post" id="dashboard-close-job-form" autocomplete="off">
                 {% csrf_token %}
                 <input type="hidden" name="next" id="dashboard-close-next" value="{% url 'staff_dashboard' %}">
                 <div class="modal-header">
@@ -2280,6 +2280,33 @@
             return;
         }
 
+        const hoursEl = document.getElementById('id_reminder_hours');
+        const minsEl = document.getElementById('id_reminder_minutes');
+        if (hoursEl && hoursEl.value !== '') {
+            const h = parseInt(hoursEl.value, 10);
+            if (isNaN(h) || h < 0 || h > 23) {
+                if (stepTurnaroundTab && window.bootstrap) {
+                    bootstrap.Tab.getOrCreateInstance(stepTurnaroundTab).show();
+                }
+                hoursEl.classList.add('is-invalid');
+                hoursEl.focus();
+                showMessage('error', 'Reminder hour must be between 0 and 23.');
+                return;
+            }
+        }
+        if (minsEl && minsEl.value !== '') {
+            const m = parseInt(minsEl.value, 10);
+            if (isNaN(m) || m < 0 || m > 59) {
+                if (stepTurnaroundTab && window.bootstrap) {
+                    bootstrap.Tab.getOrCreateInstance(stepTurnaroundTab).show();
+                }
+                minsEl.classList.add('is-invalid');
+                minsEl.focus();
+                showMessage('error', 'Reminder minute must be between 0 and 59.');
+                return;
+            }
+        }
+
         // Open print receipt tab synchronously during click event to bypass browser popup blockers
         let receiptWindow = null;
         try {
@@ -2732,7 +2759,7 @@
         addButton.addEventListener('click', () => addDeviceForm(false));
     }
 
-    // Top-Level Old Job / Barcode Lookup Handlers
+    // Top-Level Old Job Lookup Handlers
     async function handleTopLevelLookup() {
         if (!lookupOldJobInput) return;
         const q = (lookupOldJobInput.value || '').trim();
@@ -3151,6 +3178,48 @@
             }
         });
     }
+
+    // Strict bounds enforcement for follow-up reminder (max 23 hr, max 59 min)
+    const reminderHoursInput = document.getElementById('id_reminder_hours');
+    const reminderMinutesInput = document.getElementById('id_reminder_minutes');
+
+    function bindReminderInputLimits(input, maxVal) {
+        if (!input) return;
+        input.addEventListener('keydown', function (e) {
+            if (['e', 'E', '+', '-', '.'].includes(e.key)) {
+                e.preventDefault();
+            }
+        });
+        input.addEventListener('input', function () {
+            input.classList.remove('is-invalid');
+            const raw = input.value.replace(/[^0-9]/g, '');
+            if (raw === '') {
+                input.value = '';
+                return;
+            }
+            const val = parseInt(raw, 10);
+            if (isNaN(val) || val < 0) {
+                input.value = '0';
+            } else if (val > maxVal) {
+                input.value = String(maxVal);
+            } else if (input.value !== raw) {
+                input.value = raw;
+            }
+        });
+        input.addEventListener('change', function () {
+            if (input.value !== '') {
+                const val = parseInt(input.value, 10);
+                if (isNaN(val) || val < 0) {
+                    input.value = '0';
+                } else if (val > maxVal) {
+                    input.value = String(maxVal);
+                }
+            }
+        });
+    }
+
+    bindReminderInputLimits(reminderHoursInput, 23);
+    bindReminderInputLimits(reminderMinutesInput, 59);
 
     addDeviceForm(true);
     renderPhonePriorityInfo(null);

@@ -32,8 +32,8 @@
                             <i class="fa-solid fa-file-invoice me-1"></i>Bill
                         </a>
                         {% if staff_access.job_status_change %}
-                        <a href="{% url 'mark_ready_for_pickup' job_code=job.job_code %}" class="btn btn-success btn-sm">
-                            <i class="fa-solid fa-hand-point-right me-1"></i>Mark Ready
+                        <a href="{% url 'mark_ready_for_pickup' job_code=job.job_code %}" class="btn btn-success btn-sm text-white">
+                            <i class="fa-solid fa-hand-point-right me-1 text-white"></i>Mark Ready
                         </a>
                         {% endif %}
                     </div>

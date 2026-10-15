@@ -4,7 +4,7 @@
     {% load job_tickets_extras %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% if enable_gst %}Tax Invoice{% else %}Payment Bill{% endif %} - {{ job.job_code }}</title>
+    <title>Retail Invoice - {{ job.job_code }}</title>
     {% if company.display_logo_url %}
     <link rel="icon" type="image/png" href="{{ company.display_logo_url }}">
     {% else %}
@@ -848,7 +848,7 @@
     <!-- SCREEN ACTION TOOLBAR (Hidden in Print) -->
     <div class="screen-toolbar no-print">
         <div class="toolbar-title">
-            <span>{% if enable_gst %}Tax Invoice{% else %}Payment Bill{% endif %}</span>
+            <span>Retail Invoice</span>
             <span class="format-badge">{{ company.get_bill_print_paper_size_display|default:"A4" }}</span>
             <span style="font-weight: 400; color: var(--ink-500);">• Ticket #{{ job.job_code }}</span>
         </div>
@@ -897,16 +897,14 @@
                         {% if company.website %} | {{ company.website }}{% endif %}
                     </div>
                     <div class="brand-tax-tags">
-                        {% if company.gstin %}<span><strong>GSTIN:</strong> {{ company.gstin }}</span>{% endif %}
                         {% if company.pan %}<span><strong>PAN:</strong> {{ company.pan }}</span>{% endif %}
-                        {% if company.state_code %}<span><strong>State Code:</strong> {{ company.state_code }}</span>{% endif %}
                     </div>
                 </div>
             </div>
 
             <div class="invoice-badge-box">
                 <div class="invoice-title">
-                    {% if enable_gst %}TAX INVOICE{% else %}RETAIL INVOICE{% endif %}
+                    RETAIL INVOICE
                 </div>
                 <table class="invoice-meta-table">
                     {% if job.vyapar_invoice_number and job.vyapar_invoice_number != job.job_code %}
@@ -1134,21 +1132,6 @@
                 <div class="totals-row discount-row">
                     <span class="lbl">Special Discount:</span>
                     <span class="val">- &#8377;{{ discount|floatformat:2 }}</span>
-                </div>
-                {% endif %}
-
-                {% if enable_gst %}
-                <div class="totals-row">
-                    <span class="lbl">Taxable Value:</span>
-                    <span class="val">&#8377;{{ taxable_amount|floatformat:2 }}</span>
-                </div>
-                <div class="totals-row">
-                    <span class="lbl">CGST ({{ cgst_rate|floatformat:1 }}%):</span>
-                    <span class="val">&#8377;{{ cgst_amount|floatformat:2 }}</span>
-                </div>
-                <div class="totals-row">
-                    <span class="lbl">SGST ({{ sgst_rate|floatformat:1 }}%):</span>
-                    <span class="val">&#8377;{{ sgst_amount|floatformat:2 }}</span>
                 </div>
                 {% endif %}
 

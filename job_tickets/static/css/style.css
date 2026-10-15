@@ -466,15 +466,86 @@ h6,
     background-color: #f1f5f9 !important;
 }
 
-.table a {
+.table a:not(.btn):not(.badge) {
     color: var(--primary);
     text-decoration: none;
     font-weight: 500;
 }
 
-.table a:hover {
+.table a:not(.btn):not(.badge):hover {
     color: var(--primary-hover);
     text-decoration: underline;
+}
+
+/* Ensure buttons inside tables and across views retain proper contrast and colors */
+.table .btn, .table a.btn {
+    text-decoration: none !important;
+}
+
+.btn-success, .table .btn-success, .table a.btn-success {
+    background-color: var(--success, #10b981) !important;
+    border-color: var(--success, #10b981) !important;
+    color: #ffffff !important;
+}
+
+.btn-success:hover, .btn-success:focus,
+.table .btn-success:hover, .table a.btn-success:hover,
+.table .btn-success:focus, .table a.btn-success:focus {
+    background-color: #059669 !important;
+    border-color: #059669 !important;
+    color: #ffffff !important;
+}
+
+.btn-success i, .btn-success span,
+.table .btn-success i, .table a.btn-success i,
+.table .btn-success span, .table a.btn-success span {
+    color: #ffffff !important;
+}
+
+.btn-outline-success, .table .btn-outline-success, .table a.btn-outline-success {
+    color: #059669 !important;
+    border-color: #10b981 !important;
+    background-color: #ffffff !important;
+}
+
+.btn-outline-success:hover, .btn-outline-success:focus,
+.table .btn-outline-success:hover, .table a.btn-outline-success:hover,
+.table .btn-outline-success:focus, .table a.btn-outline-success:focus {
+    color: #ffffff !important;
+    background-color: var(--success, #10b981) !important;
+    border-color: var(--success, #10b981) !important;
+}
+
+.btn-outline-success i, .table .btn-outline-success i {
+    color: inherit !important;
+}
+.btn-outline-success:hover i, .table .btn-outline-success:hover i {
+    color: #ffffff !important;
+}
+
+.table .btn-primary, .table a.btn-primary {
+    color: #ffffff !important;
+}
+.table .btn-primary i, .table a.btn-primary i {
+    color: #ffffff !important;
+}
+
+.table .btn-danger, .table a.btn-danger {
+    color: #ffffff !important;
+}
+.table .btn-danger i, .table a.btn-danger i {
+    color: #ffffff !important;
+}
+
+.table .btn-outline-primary, .table a.btn-outline-primary {
+    color: var(--primary) !important;
+}
+.table .btn-outline-primary:hover, .table a.btn-outline-primary:hover {
+    color: #ffffff !important;
+    background-color: var(--primary) !important;
+}
+.table .btn-outline-primary i, .table a.btn-outline-primary i {
+    color: inherit !important;
 }
 
 .btn {
@@ -2152,6 +2223,12 @@ body.sidebar-collapsed .sidebar-menu-divider {
     color: #6f2e86;
     background: #f6edfb;
     border-color: #dfc5ec;
+}
+
+.inv-entry-type--opening_stock {
+    color: #475569;
+    background: #f1f5f9;
+    border-color: #cbd5e1;
 }
 
 .quick-pop-modal .modal-dialog {

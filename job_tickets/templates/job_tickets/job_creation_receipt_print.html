@@ -626,7 +626,6 @@
                     {% if company.tagline %}<p>{{ company.tagline }}</p>{% endif %}
                     <p>{{ company.address }}{% if company.city %}, {{ company.city }}{% endif %}{% if company.pincode %} - {{ company.pincode }}{% endif %}</p>
                     <p class="contact-line">Ph: {{ company.phone1 }}{% if company.phone2 %} | {{ company.phone2 }}{% endif %}</p>
-                    {% if company.gstin %}<p>GSTIN: <strong>{{ company.gstin }}</strong></p>{% endif %}
                 </div>
             </div>
             <div class="header-badge-box">

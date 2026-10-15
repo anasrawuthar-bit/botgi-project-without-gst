@@ -568,8 +568,19 @@ class VendorForm(forms.ModelForm):
         model = Vendor
         fields = ['company_name', 'name', 'phone', 'email', 'specialties']
         widgets = {
+            'phone': forms.TextInput(attrs={'class': 'form-control phone-input', 'placeholder': '98765 43210', 'inputmode': 'numeric', 'maxlength': '10', 'autocomplete': 'off'}),
             'specialties': forms.Textarea(attrs={'rows': 3}),
         }
+
+    def clean_phone(self):
+        phone, error = normalize_indian_phone(
+            self.cleaned_data.get('phone'),
+            required=False,
+            field_label='Phone number',
+        )
+        if error:
+            raise forms.ValidationError(error)
+        return phone
 
 
 class ClientForm(forms.ModelForm):
@@ -652,58 +663,61 @@ class ProductForm(forms.ModelForm):
             'customer_warranty_months': 'Customer Warranty (Months)',
         }
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.TextInput(attrs={'class': 'form-control'}),
-            'brand': forms.TextInput(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'category': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off', 'list': 'product-category-datalist'}),
+            'brand': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
             'item_type': forms.Select(attrs={'class': 'form-select'}),
-            'hsn_sac_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '8471 or 9987'}),
-            'uqc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NOS, KGS, BOX'}),
+            'hsn_sac_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '8471 or 9987', 'autocomplete': 'off'}),
+            'uqc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'NOS, KGS, BOX', 'autocomplete': 'off'}),
             'tax_category': forms.Select(attrs={'class': 'form-select'}),
-            'gst_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
-            'cess_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0'}),
+            'gst_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'autocomplete': 'off'}),
+            'cess_rate': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'min': '0', 'autocomplete': 'off'}),
             'is_tax_inclusive_default': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'stock_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1'}),
-            'reserved_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1'}),
-            'bin_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Rack A - Shelf 2'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'autocomplete': 'off'}),
+            'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'autocomplete': 'off'}),
+            'stock_quantity': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1', 'autocomplete': 'off'}),
+            'reserved_stock': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1', 'autocomplete': 'off'}),
+            'bin_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. Rack A - Shelf 2', 'autocomplete': 'off'}),
             'has_serial_tracking': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'vendor_warranty_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1'}),
-            'customer_warranty_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'vendor_warranty_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1', 'autocomplete': 'off'}),
+            'customer_warranty_months': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '1', 'autocomplete': 'off'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'autocomplete': 'off'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if 'vendor_warranty_months' in self.fields:
-            self.fields['vendor_warranty_months'].required = False
-        if 'customer_warranty_months' in self.fields:
-            self.fields['customer_warranty_months'].required = False
-        if 'cess_rate' in self.fields:
-            self.fields['cess_rate'].required = False
-        if 'stock_quantity' in self.fields:
-            self.fields['stock_quantity'].required = False
-        if 'reserved_stock' in self.fields:
-            self.fields['reserved_stock'].required = False
-        if 'cost_price' in self.fields:
-            self.fields['cost_price'].required = False
-        if 'unit_price' in self.fields:
-            self.fields['unit_price'].required = False
+        for field in self.fields.values():
+            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput, forms.RadioSelect)):
+                field.widget.attrs.setdefault('autocomplete', 'off')
+        for f in [
+            'vendor_warranty_months', 'customer_warranty_months',
+            'item_type', 'hsn_sac_code', 'uqc', 'tax_category', 'gst_rate',
+            'cess_rate', 'is_tax_inclusive_default', 'purchase_price_tax_mode',
+            'sales_price_tax_mode', 'stock_quantity', 'reserved_stock',
+            'cost_price', 'unit_price',
+        ]:
+            if f in self.fields:
+                self.fields[f].required = False
+
         if not self.is_bound and not getattr(self.instance, 'pk', None):
             if 'vendor_warranty_months' in self.fields:
                 self.fields['vendor_warranty_months'].initial = 0
             if 'customer_warranty_months' in self.fields:
                 self.fields['customer_warranty_months'].initial = 0
-            try:
-                self.fields['gst_rate'].initial = CompanyProfile.get_profile().gst_rate or Decimal('18.00')
-            except Exception:
-                self.fields['gst_rate'].initial = Decimal('18.00')
-            self.fields['uqc'].initial = 'NOS'
-            self.fields['cess_rate'].initial = Decimal('0.00')
-            self.fields['cost_price'].initial = Decimal('0.00')
-            self.fields['unit_price'].initial = Decimal('0.00')
-            self.fields['stock_quantity'].initial = 0
-            self.fields['reserved_stock'].initial = 0
+            if 'gst_rate' in self.fields:
+                self.fields['gst_rate'].initial = Decimal('0.00')
+            if 'uqc' in self.fields:
+                self.fields['uqc'].initial = 'NOS'
+            if 'cess_rate' in self.fields:
+                self.fields['cess_rate'].initial = Decimal('0.00')
+            if 'cost_price' in self.fields:
+                self.fields['cost_price'].initial = Decimal('0.00')
+            if 'unit_price' in self.fields:
+                self.fields['unit_price'].initial = Decimal('0.00')
+            if 'stock_quantity' in self.fields:
+                self.fields['stock_quantity'].initial = 0
+            if 'reserved_stock' in self.fields:
+                self.fields['reserved_stock'].initial = 0
 
     def clean_vendor_warranty_months(self):
         val = self.cleaned_data.get('vendor_warranty_months')
@@ -714,10 +728,10 @@ class ProductForm(forms.ModelForm):
         return val if val is not None else 0
 
     def clean_hsn_sac_code(self):
-        return normalize_compact_code(self.cleaned_data.get('hsn_sac_code'))
+        return ''
 
     def clean_uqc(self):
-        return normalize_text_code(self.cleaned_data.get('uqc'))
+        return normalize_text_code(self.cleaned_data.get('uqc')) or 'NOS'
 
     def clean_stock_quantity(self):
         qty = self.cleaned_data.get('stock_quantity')
@@ -726,14 +740,6 @@ class ProductForm(forms.ModelForm):
                 return self.instance.stock_quantity or 0
             return 0
         return qty
-
-    def clean_cess_rate(self):
-        cess = self.cleaned_data.get('cess_rate')
-        if cess is None:
-            if self.instance and self.instance.pk:
-                return self.instance.cess_rate or Decimal('0.00')
-            return Decimal('0.00')
-        return cess
 
     def clean_cost_price(self):
         cost_price = self.cleaned_data.get('cost_price')
@@ -766,29 +772,22 @@ class ProductForm(forms.ModelForm):
         return reserved_stock
 
     def clean_gst_rate(self):
-        gst_rate = self.cleaned_data.get('gst_rate')
-        if gst_rate is not None and gst_rate < 0:
-            raise forms.ValidationError('GST rate cannot be negative.')
-        return gst_rate
+        return Decimal('0.00')
 
     def clean_cess_rate(self):
-        cess_rate = self.cleaned_data.get('cess_rate')
-        if cess_rate is not None and cess_rate < 0:
-            raise forms.ValidationError('Cess rate cannot be negative.')
-        return cess_rate
+        return Decimal('0.00')
 
     def clean(self):
         cleaned_data = super().clean()
-        tax_category = cleaned_data.get('tax_category') or 'taxable'
-        gst_rate = cleaned_data.get('gst_rate') or Decimal('0.00')
-        cess_rate = cleaned_data.get('cess_rate') or Decimal('0.00')
-
-        if tax_category != 'taxable':
-            if gst_rate > 0:
-                self.add_error('gst_rate', 'GST rate must be 0 for exempt, nil-rated, or non-GST items.')
-            if cess_rate > 0:
-                self.add_error('cess_rate', 'Cess rate must be 0 for exempt, nil-rated, or non-GST items.')
-
+        cleaned_data['item_type'] = cleaned_data.get('item_type') or 'goods'
+        cleaned_data['hsn_sac_code'] = ''
+        cleaned_data['uqc'] = cleaned_data.get('uqc') or 'NOS'
+        cleaned_data['tax_category'] = 'taxable'
+        cleaned_data['gst_rate'] = Decimal('0.00')
+        cleaned_data['cess_rate'] = Decimal('0.00')
+        cleaned_data['purchase_price_tax_mode'] = 'without_tax'
+        cleaned_data['sales_price_tax_mode'] = 'without_tax'
+        cleaned_data['is_tax_inclusive_default'] = False
         return cleaned_data
 
 
@@ -799,94 +798,89 @@ class InventoryPartyForm(forms.ModelForm):
             'name',
             'legal_name',
             'contact_person',
-            'gst_registration_type',
             'phone',
-            'gstin',
-            'state_code',
-            'default_place_of_supply_state',
             'pan',
             'email',
             'address',
             'shipping_address',
+            'pincode',
             'city',
             'state',
             'country',
-            'pincode',
             'opening_balance',
             'is_active',
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'legal_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'contact_person': forms.TextInput(attrs={'class': 'form-control'}),
-            'gst_registration_type': forms.Select(attrs={'class': 'form-select'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+91XXXXXXXXXX'}),
-            'gstin': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '22AAAAA0000A1Z5'}),
-            'state_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '32'}),
-            'default_place_of_supply_state': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '32'}),
-            'pan': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'AAAAA0000A'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'shipping_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'city': forms.TextInput(attrs={'class': 'form-control'}),
-            'state': forms.TextInput(attrs={'class': 'form-control'}),
-            'country': forms.TextInput(attrs={'class': 'form-control'}),
-            'pincode': forms.TextInput(attrs={'class': 'form-control'}),
-            'opening_balance': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'name': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'legal_name': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'contact_person': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control phone-input', 'placeholder': '98765 43210', 'inputmode': 'numeric', 'maxlength': '10', 'autocomplete': 'off'}),
+            'pan': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'AAAAA0000A', 'autocomplete': 'off'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'autocomplete': 'off'}),
+            'shipping_address': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'autocomplete': 'off'}),
+            'pincode': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'e.g. 682001', 'maxlength': '6', 'autocomplete': 'off'}),
+            'city': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'state': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'country': forms.TextInput(attrs={'class': 'form-control', 'autocomplete': 'off'}),
+            'opening_balance': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'autocomplete': 'off'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
         labels = {
             'name': 'Party Name',
             'legal_name': 'Legal Name',
             'contact_person': 'Contact Person',
-            'gst_registration_type': 'GST Registration',
-            'state_code': 'State Code',
-            'default_place_of_supply_state': 'Default POS State',
             'address': 'Billing Address',
             'shipping_address': 'Shipping Address',
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput, forms.RadioSelect)):
+                field.widget.attrs.setdefault('autocomplete', 'off')
+        for f in ['legal_name']:
+            if f in self.fields:
+                self.fields[f].required = False
         if not self.is_bound and not getattr(self.instance, 'pk', None):
             self.fields['country'].initial = 'India'
             self.fields['opening_balance'].initial = Decimal('0.00')
             self.fields['is_active'].initial = True
+        elif getattr(self.instance, 'pk', None) and self.instance.opening_balance is not None:
+            self.fields['opening_balance'].initial = abs(self.instance.opening_balance)
 
-    def clean_gstin(self):
-        return normalize_compact_code(self.cleaned_data.get('gstin'))
+    def clean_phone(self):
+        phone, error = normalize_indian_phone(
+            self.cleaned_data.get('phone'),
+            required=False,
+            field_label='Phone number',
+        )
+        if error:
+            raise forms.ValidationError(error)
+        return phone
 
     def clean_pan(self):
         return normalize_compact_code(self.cleaned_data.get('pan'))
-
-    def clean_state_code(self):
-        return normalize_compact_code(self.cleaned_data.get('state_code'))
-
-    def clean_default_place_of_supply_state(self):
-        return normalize_compact_code(self.cleaned_data.get('default_place_of_supply_state'))
 
     def clean_country(self):
         return (self.cleaned_data.get('country') or '').strip() or 'India'
 
     def clean(self):
         cleaned_data = super().clean()
-        gstin = cleaned_data.get('gstin') or ''
-        state_code = cleaned_data.get('state_code') or ''
-        registration_type = cleaned_data.get('gst_registration_type') or 'unregistered'
-        default_pos = cleaned_data.get('default_place_of_supply_state') or ''
+        cleaned_data['gst_registration_type'] = 'unregistered'
+        cleaned_data['gstin'] = ''
+        cleaned_data['state_code'] = ''
+        cleaned_data['default_place_of_supply_state'] = ''
+        if not (cleaned_data.get('shipping_address') or '').strip():
+            cleaned_data['shipping_address'] = (cleaned_data.get('address') or '').strip()
 
-        if gstin and not state_code:
-            cleaned_data['state_code'] = gstin[:2]
-            state_code = cleaned_data['state_code']
-
-        if gstin and state_code and gstin[:2] != state_code:
-            self.add_error('state_code', 'State code must match the first two digits of the GSTIN.')
-
-        if registration_type in {'registered', 'composition', 'sez'} and not gstin:
-            self.add_error('gstin', 'GSTIN is required for the selected registration type.')
-
-        if not default_pos and state_code:
-            cleaned_data['default_place_of_supply_state'] = state_code
+        raw_balance = abs(cleaned_data.get('opening_balance') or Decimal('0.00'))
+        bal_type_key = self.add_prefix('opening_balance_type')
+        bal_type = (self.data.get(bal_type_key) or 'to_receive').strip()
+        if bal_type == 'to_pay':
+            cleaned_data['opening_balance'] = -raw_balance
+        else:
+            cleaned_data['opening_balance'] = raw_balance
 
         return cleaned_data
 
@@ -894,6 +888,14 @@ class InventoryPartyForm(forms.ModelForm):
         party = super().save(commit=False)
         # Keep a single shared party master for both purchase and sales flows.
         party.party_type = 'both'
+        party.gst_registration_type = 'unregistered'
+        party.gstin = ''
+        party.state_code = ''
+        party.default_place_of_supply_state = ''
+        if 'opening_balance' in self.cleaned_data:
+            party.opening_balance = self.cleaned_data['opening_balance']
+        if not (party.shipping_address or '').strip():
+            party.shipping_address = (party.address or '').strip()
         if commit:
             party.save()
             self.save_m2m()
@@ -904,20 +906,23 @@ class InventoryEntryForm(forms.ModelForm):
     invoice_date = forms.DateField(
         required=False,
         label='Invoice Date',
-        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        widget=forms.DateInput(attrs={'class': 'form-control', 'type': 'date', 'autocomplete': 'off'}),
     )
 
     class Meta:
         model = InventoryEntry
         fields = ['entry_date', 'invoice_date', 'invoice_number', 'party']
         widgets = {
-            'entry_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'invoice_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank for auto invoice number'}),
+            'entry_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date', 'autocomplete': 'off'}),
+            'invoice_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank for auto invoice number', 'autocomplete': 'off'}),
             'party': forms.Select(attrs={'class': 'form-select'}),
         }
 
     def __init__(self, *args, entry_type='purchase', workspace=None, **kwargs):
         super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            if not isinstance(field.widget, (forms.HiddenInput, forms.CheckboxInput, forms.RadioSelect)):
+                field.widget.attrs.setdefault('autocomplete', 'off')
         self.entry_type = entry_type
 
         self.fields['party'].label = "Party"
@@ -1057,9 +1062,11 @@ class CompanyProfileForm(forms.ModelForm):
         state_code = cleaned_data.get('state_code') or ''
         default_pos = cleaned_data.get('default_place_of_supply_state') or ''
         registration_type = cleaned_data.get('registration_type') or 'regular'
-        enable_gst = bool(cleaned_data.get('enable_gst'))
-        filing_frequency = cleaned_data.get('filing_frequency') or 'monthly'
-        qrmp_enabled = bool(cleaned_data.get('qrmp_enabled'))
+        cleaned_data['enable_gst'] = False
+        cleaned_data['gst_rate'] = Decimal('0.00')
+        cleaned_data['qrmp_enabled'] = False
+        cleaned_data['lut_bond_enabled'] = False
+        cleaned_data['e_invoice_applicable'] = False
 
         if gstin and not state_code:
             cleaned_data['state_code'] = gstin[:2]
@@ -1067,12 +1074,6 @@ class CompanyProfileForm(forms.ModelForm):
 
         if gstin and state_code and gstin[:2] != state_code:
             self.add_error('state_code', 'State code must match the first two digits of the GSTIN.')
-
-        if enable_gst and registration_type != 'unregistered' and not gstin:
-            self.add_error('gstin', 'GSTIN is required when GST billing is enabled for a registered business.')
-
-        if qrmp_enabled and filing_frequency != 'quarterly':
-            self.add_error('filing_frequency', 'QRMP can only be enabled when filing frequency is quarterly.')
 
         if not default_pos and state_code:
             cleaned_data['default_place_of_supply_state'] = state_code

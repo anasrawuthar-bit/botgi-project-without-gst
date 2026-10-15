@@ -382,6 +382,61 @@ class Product(models.Model):
         return self.gst_rate or Decimal('0.00')
 
 
+class ItemCategory(models.Model):
+    workspace = models.ForeignKey(
+        CompanyWorkspace,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='item_categories',
+        db_index=True,
+    )
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        constraints = [
+            models.UniqueConstraint(fields=['workspace', 'name'], name='unique_item_category_per_workspace'),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def get_or_create_category(cls, name, workspace=None):
+        clean_name = (name or '').strip()
+        if not clean_name:
+            return None
+        cat = cls.objects.filter(workspace=workspace, name__iexact=clean_name).first()
+        if not cat:
+            cat = cls.objects.create(workspace=workspace, name=clean_name)
+        return cat
+
+    @classmethod
+    def sync_from_products(cls, workspace=None):
+        existing_cats = Product.objects.filter(workspace=workspace).exclude(category__isnull=True).exclude(category__exact='').values_list('category', flat=True).distinct()
+        for c in existing_cats:
+            clean_c = c.strip()
+            if clean_c:
+                cls.get_or_create_category(clean_c, workspace=workspace)
+
+    @classmethod
+    def get_categories_with_counts(cls, workspace=None):
+        cls.sync_from_products(workspace=workspace)
+        categories = list(cls.objects.filter(workspace=workspace).order_by('name'))
+        counts = {}
+        for p in Product.objects.filter(workspace=workspace).exclude(category__isnull=True).exclude(category__exact='').values('category'):
+            c_name = (p.get('category') or '').strip().lower()
+            if c_name:
+                counts[c_name] = counts.get(c_name, 0) + 1
+        for cat in categories:
+            cat.product_count = counts.get(cat.name.strip().lower(), 0)
+        return categories
+
+
 class InventoryParty(models.Model):
     PARTY_TYPE_CHOICES = [
         ('supplier', 'Supplier'),

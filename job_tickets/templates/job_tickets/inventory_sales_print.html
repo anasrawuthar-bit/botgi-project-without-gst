@@ -162,7 +162,6 @@
                 <h4>Party</h4>
                 <p><strong>{{ party.name }}</strong></p>
                 {% if party.phone %}<p>Phone: {{ party.phone }}</p>{% endif %}
-                {% if party.gstin %}<p>GSTIN: {{ party.gstin }}</p>{% endif %}
             </div>
             <div>
                 <h4>Invoice Summary</h4>
@@ -180,8 +179,6 @@
                     <th class="num">Rate</th>
                     <th class="num">Amount</th>
                     <th class="num">Discount</th>
-                    <th class="num">GST %</th>
-                    <th class="num">Tax</th>
                     <th class="num">Total</th>
                 </tr>
             </thead>
@@ -191,6 +188,11 @@
                     <td>{{ forloop.counter }}</td>
                     <td>
                         {{ line.product.name }}
+                        {% if line.notes %}
+                            <div style="font-size: 0.8rem; color: #4b5563; margin-top: 2px;">
+                                {{ line.notes }}
+                            </div>
+                        {% endif %}
                         {% if line.serial_numbers_text %}
                             <div style="font-size: 0.78rem; color: #4b5563; font-family: monospace; margin-top: 2px;">
                                 <strong>S/N:</strong> {{ line.serial_numbers_text }}
@@ -201,8 +203,6 @@
                     <td class="num">&#8377;{{ line.unit_price|floatformat:2 }}</td>
                     <td class="num">&#8377;{{ line.line_subtotal|floatformat:2 }}</td>
                     <td class="num">&#8377;{{ line.discount_amount|floatformat:2 }}</td>
-                    <td class="num">{{ line.gst_rate|floatformat:2 }}</td>
-                    <td class="num">&#8377;{{ line.gst_amount|floatformat:2 }}</td>
                     <td class="num"><strong>&#8377;{{ line.total_amount|floatformat:2 }}</strong></td>
                 </tr>
                 {% endfor %}
@@ -211,9 +211,9 @@
 
         <div class="totals">
             <div class="row"><span>Subtotal</span><strong>&#8377;{{ subtotal_amount|floatformat:2 }}</strong></div>
+            {% if total_discount > 0 %}
             <div class="row"><span>Total Discount</span><strong>&#8377;{{ total_discount|floatformat:2 }}</strong></div>
-            <div class="row"><span>Taxable Amount</span><strong>&#8377;{{ taxable_total|floatformat:2 }}</strong></div>
-            <div class="row"><span>Total Tax</span><strong>&#8377;{{ tax_total|floatformat:2 }}</strong></div>
+            {% endif %}
             <div class="row grand"><span>Grand Total</span><strong>&#8377;{{ grand_total|floatformat:2 }}</strong></div>
         </div>
 

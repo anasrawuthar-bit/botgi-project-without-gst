@@ -1152,6 +1152,82 @@ class TechnicianAssignmentAndChecklistTests(TestCase):
         self.assertGreaterEqual(reminder.due_at, before + timedelta(hours=1, minutes=30))
         self.assertLessEqual(reminder.due_at, timezone.now() + timedelta(hours=1, minutes=31))
 
+    def test_reminder_offset_bounds(self):
+        from .views.staff_views import _parse_reminder_offset
+
+        # Valid boundaries: 23 hours, 59 minutes
+        delta, err = _parse_reminder_offset({'reminder_hours': '23', 'reminder_minutes': '59'})
+        self.assertEqual(err, '')
+        self.assertEqual(delta, timedelta(hours=23, minutes=59))
+
+        delta, err = _parse_reminder_offset({'reminder_hours': '0', 'reminder_minutes': '0'})
+        self.assertEqual(err, '')
+        self.assertIsNone(delta)
+
+        # Exceeding hour (> 23)
+        delta, err = _parse_reminder_offset({'reminder_hours': '24', 'reminder_minutes': '0'})
+        self.assertIsNone(delta)
+        self.assertEqual(err, 'Reminder hour must be between 0 and 23.')
+
+        # Exceeding minute (> 59)
+        delta, err = _parse_reminder_offset({'reminder_hours': '0', 'reminder_minutes': '60'})
+        self.assertIsNone(delta)
+        self.assertEqual(err, 'Reminder minute must be between 0 and 59.')
+
+        # Negative hour
+        delta, err = _parse_reminder_offset({'reminder_hours': '-1', 'reminder_minutes': '0'})
+        self.assertIsNone(delta)
+        self.assertEqual(err, 'Reminder hour must be between 0 and 23.')
+
+        # Negative minute
+        delta, err = _parse_reminder_offset({'reminder_hours': '0', 'reminder_minutes': '-5'})
+        self.assertIsNone(delta)
+        self.assertEqual(err, 'Reminder minute must be between 0 and 59.')
+
+    def test_staff_dashboard_job_create_reminder_bounds_rejection(self):
+        self.client.force_login(self.staff_user)
+        # Attempt with hours = 24
+        response = self.client.post(
+            reverse('staff_dashboard'),
+            {
+                'job_ticket_form_submit': '1',
+                'customer_name': 'Invalid Reminder Hours',
+                'customer_phone': '9876543228',
+                'reminder_hours': '24',
+                'reminder_minutes': '0',
+                'device_forms[0].device_type': 'Laptop',
+                'device_forms[0].device_brand': 'Dell',
+                'device_forms[0].device_model': 'Latitude',
+                'device_forms[0].reported_issue': 'Test',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data.get('success'))
+        self.assertEqual(data.get('message'), 'Reminder hour must be between 0 and 23.')
+
+        # Attempt with minutes = 60
+        response = self.client.post(
+            reverse('staff_dashboard'),
+            {
+                'job_ticket_form_submit': '1',
+                'customer_name': 'Invalid Reminder Mins',
+                'customer_phone': '9876543228',
+                'reminder_hours': '0',
+                'reminder_minutes': '60',
+                'device_forms[0].device_type': 'Laptop',
+                'device_forms[0].device_brand': 'Dell',
+                'device_forms[0].device_model': 'Latitude',
+                'device_forms[0].reported_issue': 'Test',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data.get('success'))
+        self.assertEqual(data.get('message'), 'Reminder minute must be between 0 and 59.')
+
     def test_staff_dashboard_job_create_with_custom_job_date(self):
         self.client.force_login(self.staff_user)
         past_date = (timezone.localdate() - timedelta(days=5)).strftime('%Y-%m-%d')
@@ -5630,6 +5706,20 @@ class TechnicianAssignmentAndCompletionTests(TestCase):
         self.job.refresh_from_db()
         self.assertEqual(self.job.status, 'Completed')
 
+    def test_technician_job_detail_routes_both_paths(self):
+        self.job.assigned_to = self.tech_profile
+        self.job.save()
+        self.client_obj.force_login(self.tech_user)
+
+        # Primary path: /technician-dashboard/<job_code>/
+        resp1 = self.client_obj.get(reverse('job_detail_technician', args=[self.job.job_code]))
+        self.assertEqual(resp1.status_code, 200)
+
+        # Alias path: /technician/job/<job_code>/
+        resp2 = self.client_obj.get(reverse('technician_job_detail_alias', args=[self.job.job_code]))
+        self.assertEqual(resp2.status_code, 200)
+
+
 
 
 class StandaloneTaskSystemTests(TestCase):
@@ -6698,6 +6788,247 @@ class TechnicianProfileAndQrMobileTests(TestCase):
         staff_qr_resp = self.client.get(reverse('staff_generate_qr_token', args=[self.staff_user.id]))
         self.assertEqual(staff_qr_resp.status_code, 400)
         self.assertFalse(staff_qr_resp.json()['ok'])
+
+
+class InventorySalesPurchaseChartTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='chart_staff', password='Password123!', is_staff=True)
+        self.workspace = CompanyWorkspace.objects.create(name='Chart Test Workshop', slug='chart-test-ws', owner=self.user)
+        CompanyUserMembership.objects.create(user=self.user, workspace=self.workspace, role='ADMIN')
+        apply_staff_access(self.user, [
+            "dashboard", "job_tickets", "clients", "inventory",
+        ])
+        self.party = InventoryParty.objects.create(
+            name='Test Party',
+            party_type='both',
+            workspace=self.workspace,
+        )
+        self.product = Product.objects.create(
+            name='Test SSD',
+            sku='SSD-512',
+            unit_price=Decimal('2500.00'),
+            cost_price=Decimal('1800.00'),
+            workspace=self.workspace,
+        )
+        self.bill = InventoryBill.objects.create(
+            bill_number='BILL-CHART-001',
+            entry_type='sale',
+            party=self.party,
+            workspace=self.workspace,
+            entry_date=timezone.localdate(),
+        )
+        InventoryEntry.objects.create(
+            entry_number='ENT-S-001',
+            bill=self.bill,
+            party=self.party,
+            product=self.product,
+            entry_type='sale',
+            quantity=2,
+            unit_price=Decimal('2500.00'),
+            total_amount=Decimal('5000.00'),
+            workspace=self.workspace,
+            entry_date=timezone.localdate(),
+        )
+        self.purchase_bill = InventoryBill.objects.create(
+            bill_number='BILL-PUR-001',
+            entry_type='purchase',
+            party=self.party,
+            workspace=self.workspace,
+            entry_date=timezone.localdate(),
+        )
+        InventoryEntry.objects.create(
+            entry_number='ENT-P-001',
+            bill=self.purchase_bill,
+            party=self.party,
+            product=self.product,
+            entry_type='purchase',
+            quantity=5,
+            unit_price=Decimal('1800.00'),
+            total_amount=Decimal('9000.00'),
+            workspace=self.workspace,
+            entry_date=timezone.localdate(),
+        )
+
+    def test_build_chart_data_aggregates_sales_and_purchases(self):
+        from .views.helpers import _build_cash_flow_chart_data
+        data = _build_cash_flow_chart_data(self.workspace, 'this_month')
+        self.assertEqual(data['total_sales'], 5000.00)
+        self.assertEqual(data['total_purchases'], 9000.00)
+        self.assertEqual(data['total_sales_qty'], 2)
+        self.assertEqual(data['total_purchases_qty'], 5)
+        self.assertIn('sales', data)
+        self.assertIn('purchases', data)
+        self.assertEqual(len(data['sales']), len(data['labels']))
+        self.assertEqual(len(data['purchases']), len(data['labels']))
+
+    def test_chart_api_endpoint(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('inventory_cash_flow_chart_api'), {'range': 'this_month'})
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['total_sales'], 5000.00)
+        self.assertEqual(payload['total_purchases'], 9000.00)
+        self.assertEqual(payload['total_sales_qty'], 2)
+        self.assertEqual(payload['total_purchases_qty'], 5)
+
+
+class RateFieldNoSpecialCharactersTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='test_rate_user', password='password123', is_staff=True)
+        self.workspace = CompanyWorkspace.objects.create(name='Rate Test Workshop', slug='rate-test-ws', owner=self.user)
+        CompanyUserMembership.objects.create(user=self.user, workspace=self.workspace, role='ADMIN')
+        self.product = Product.objects.create(
+            name='Test Mouse',
+            cost_price=Decimal('100.00'),
+            unit_price=Decimal('150.00'),
+            workspace=self.workspace,
+            stock_quantity=10,
+        )
+
+    def test_collect_inventory_bill_lines_rejects_special_characters(self):
+        from .views.helpers import _collect_inventory_bill_lines
+        invalid_rates = ['100@', '$100', '-50', '1e5', '₹200', '100#', '12%34', '100+']
+        for bad_rate in invalid_rates:
+            with self.subTest(rate=bad_rate):
+                with self.assertRaises(ValueError) as ctx:
+                    _collect_inventory_bill_lines(
+                        product_ids=[str(self.product.id)],
+                        quantities=['1'],
+                        unit_prices=[bad_rate],
+                        gst_rates=['0.00'],
+                        workspace=self.workspace,
+                    )
+                self.assertIn('special characters are not allowed in rate', str(ctx.exception).lower())
+
+    def test_collect_inventory_bill_lines_accepts_valid_rates(self):
+        from .views.helpers import _collect_inventory_bill_lines
+        valid_rates = ['100', '150.50', '0.75', '2500.00']
+        for good_rate in valid_rates:
+            with self.subTest(rate=good_rate):
+                lines = _collect_inventory_bill_lines(
+                    product_ids=[str(self.product.id)],
+                    quantities=['1'],
+                    unit_prices=[good_rate],
+                    gst_rates=['0.00'],
+                    workspace=self.workspace,
+                )
+                self.assertEqual(len(lines), 1)
+                self.assertEqual(lines[0]['unit_price'], Decimal(good_rate))
+
+
+class PhoneValidationTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username='phone_test_user', password='password123', is_staff=True)
+        self.workspace = CompanyWorkspace.objects.create(name='Phone Test Workshop', slug='phone-test-ws', owner=self.user)
+        CompanyUserMembership.objects.create(user=self.user, workspace=self.workspace, role='ADMIN')
+        apply_staff_access(self.user, ["dashboard", "inventory", "staff_dashboard"])
+
+    def test_inventory_party_form_phone_validation(self):
+        from .forms import InventoryPartyForm
+        # Invalid phone with letters/symbols
+        form_invalid = InventoryPartyForm(data={
+            'name': 'Test Supplier',
+            'phone': '897465465465zsdfgzsdxf',
+            'country': 'India',
+            'opening_balance': '0.00',
+        })
+        self.assertFalse(form_invalid.is_valid())
+        self.assertIn('phone', form_invalid.errors)
+
+        # Valid 10-digit phone
+        form_valid = InventoryPartyForm(data={
+            'name': 'Valid Supplier',
+            'phone': '9876543210',
+            'country': 'India',
+            'opening_balance': '0.00',
+        })
+        self.assertTrue(form_valid.is_valid())
+        self.assertEqual(form_valid.cleaned_data['phone'], '9876543210')
+
+    def test_quick_add_party_phone_validation(self):
+        self.client.force_login(self.user)
+        # Attempting to save with invalid letters/too long phone
+        resp_invalid = self.client.post(reverse('inventory_quick_add_party'), {
+            'name': 'Party With Bad Phone',
+            'phone': '897465465465zsdfgzsdxf',
+        })
+        self.assertEqual(resp_invalid.status_code, 400)
+        self.assertFalse(resp_invalid.json().get('ok', True))
+
+        # Saving with clean 10-digit phone
+        resp_valid = self.client.post(reverse('inventory_quick_add_party'), {
+            'name': 'Party With Good Phone',
+            'phone': '9876543210',
+        })
+        self.assertEqual(resp_valid.status_code, 200)
+        self.assertTrue(resp_valid.json().get('ok'))
+        self.assertEqual(resp_valid.json()['party']['phone'], '9876543210')
+
+    def test_customer_phone_lookup_accepts_spaced_and_raw_10_digits(self):
+        from .views.helpers import normalize_indian_phone
+        phone, err = normalize_indian_phone('98765 43210')
+        self.assertEqual(phone, '9876543210')
+        self.assertIsNone(err)
+        phone2, err2 = normalize_indian_phone('+91 98765 43210')
+        self.assertEqual(phone2, '9876543210')
+        self.assertIsNone(err2)
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('client_phone_lookup'), {'phone': '98765 43210'})
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json().get('ok'))
+
+
+
+class QuickAddProductCategoryTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="catuser",
+            password="testpassword123",
+            is_staff=True,
+        )
+        self.workspace = CompanyWorkspace.objects.create(
+            name="Category Test Workspace",
+            slug="cat-test-ws",
+            owner=self.user,
+        )
+        self.user.current_workspace = self.workspace
+        self.user.save()
+        CompanyUserMembership.objects.create(user=self.user, workspace=self.workspace, role='ADMIN')
+        apply_staff_access(self.user, ["dashboard", "inventory"])
+        from .models import ItemCategory
+        ItemCategory.objects.create(workspace=self.workspace, name="Smartphones")
+        ItemCategory.objects.create(workspace=self.workspace, name="Accessories")
+
+    def test_inventory_entry_renders_category_datalist(self):
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('inventory_sales_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode('utf-8')
+        self.assertIn('id="quick-product-category"', content)
+        self.assertIn('list="quick-product-category-datalist"', content)
+        self.assertIn('id="quick-product-category-datalist"', content)
+        self.assertIn('Smartphones', content)
+        self.assertIn('Accessories', content)
+
+    def test_quick_add_product_creates_and_returns_category(self):
+        from .models import ItemCategory
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('inventory_quick_add_product'), {
+            'name': 'iPhone 15 Pro',
+            'sku': 'IPH15PRO-128',
+            'category': 'Flagship Phones',
+            'cost_price': '80000.00',
+            'unit_price': '110000.00',
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data.get('ok'))
+        self.assertEqual(data['product']['category'], 'Flagship Phones')
+        self.assertTrue(
+            ItemCategory.objects.filter(workspace=self.workspace, name='Flagship Phones').exists()
+        )
+
+
 
 
 

@@ -116,10 +116,10 @@ def _parse_reminder_offset(post_data, *, hour_field='reminder_hours', minute_fie
     except (TypeError, ValueError):
         return None, 'Reminder hour and minute must be valid numbers.'
 
-    if hours < 0 or hours > 24:
-        return None, 'Reminder hour must be between 0 and 24.'
-    if minutes < 0 or minutes > 60:
-        return None, 'Reminder minute must be between 0 and 60.'
+    if hours < 0 or hours > 23:
+        return None, 'Reminder hour must be between 0 and 23.'
+    if minutes < 0 or minutes > 59:
+        return None, 'Reminder minute must be between 0 and 59.'
     if hours == 0 and minutes == 0:
         if require_value:
             return None, 'Enter reminder hour or minute.'

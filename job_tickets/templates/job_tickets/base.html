@@ -35,7 +35,7 @@
             } catch (e) {}
         })();
     </script>
-    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=3.3">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=3.4">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     {% if company.display_logo_url %}
     <link rel="icon" type="image/png" href="{{ company.display_logo_url }}">
@@ -326,8 +326,8 @@
                     </a>
                 </li>
                 <li>
-                    <a class="sidebar-link settings-nav-link" href="#legal-tax" data-settings-tab="#legal-tax" data-tooltip="Legal & Tax">
-                        <i class="fa-solid fa-file-invoice"></i><span class="sidebar-link-label">Legal & Tax</span>
+                    <a class="sidebar-link settings-nav-link" href="#legal-tax" data-settings-tab="#legal-tax" data-tooltip="Legal Details">
+                        <i class="fa-solid fa-scale-balanced"></i><span class="sidebar-link-label">Legal Details</span>
                     </a>
                 </li>
                 <li>
@@ -344,11 +344,6 @@
                 <li>
                     <a class="sidebar-link settings-nav-link" href="#bill-settings" data-settings-tab="#bill-settings" data-tooltip="Bill & Invoice Configuration">
                         <i class="fa-solid fa-receipt"></i><span class="sidebar-link-label">Bill / Invoice</span>
-                    </a>
-                </li>
-                <li>
-                    <a class="sidebar-link settings-nav-link" href="#billing-settings" data-settings-tab="#billing-settings" data-tooltip="Tax & GST Settings">
-                        <i class="fa-solid fa-indian-rupee-sign"></i><span class="sidebar-link-label">Tax & GST</span>
                     </a>
                 </li>
                 <li>
@@ -1623,13 +1618,331 @@
             });
         }
 
+        function disableBrowserAutocomplete(root) {
+            const scope = root || document;
+            if (!scope.querySelectorAll) return;
+            scope.querySelectorAll('form').forEach(function (form) {
+                form.setAttribute('autocomplete', 'off');
+            });
+            scope.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="password"]), textarea').forEach(function (input) {
+                input.setAttribute('autocomplete', 'off');
+                input.setAttribute('autocorrect', 'off');
+                input.setAttribute('autocapitalize', 'off');
+                input.setAttribute('spellcheck', 'false');
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             initSearchableComboboxes(document);
+            disableBrowserAutocomplete(document);
+        });
+
+        document.addEventListener('show.bs.modal', function (e) {
+            disableBrowserAutocomplete(e.target);
         });
 
         document.addEventListener('shown.bs.modal', function (e) {
             initSearchableComboboxes(e.target);
+            disableBrowserAutocomplete(e.target);
         });
+
+        document.addEventListener('focusin', function (e) {
+            const el = e.target;
+            if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) {
+                const type = (el.type || '').toLowerCase();
+                if (type !== 'hidden' && type !== 'checkbox' && type !== 'radio' && type !== 'password') {
+                    if (el.getAttribute('autocomplete') !== 'off') {
+                        el.setAttribute('autocomplete', 'off');
+                    }
+                    if (el.getAttribute('spellcheck') !== 'false') {
+                        el.setAttribute('spellcheck', 'false');
+                    }
+                }
+            }
+        }, true);
+
+        if (window.MutationObserver) {
+            const autocompleteObserver = new MutationObserver(function (mutations) {
+                mutations.forEach(function (mutation) {
+                    mutation.addedNodes.forEach(function (node) {
+                        if (node.nodeType === 1) {
+                            disableBrowserAutocomplete(node);
+                        }
+                    });
+                });
+            });
+            autocompleteObserver.observe(document.documentElement, { childList: true, subtree: true });
+        }
+    </script>
+
+    <!-- Global Rate Field Protection: Disallow special characters (+, -, e, E, currency symbols, etc.) -->
+    <script>
+        (function () {
+            function isRateInput(el) {
+                if (!el || el.tagName !== 'INPUT') return false;
+                if (el.classList.contains('rate-input') ||
+                    el.classList.contains('inventory-rate-input') ||
+                    el.classList.contains('edit-sale-line-rate') ||
+                    el.classList.contains('edit-party-bill-line-rate')) {
+                    return true;
+                }
+                const name = el.getAttribute('name') || '';
+                if (name === 'line_unit_price[]' ||
+                    name === 'edit_line_unit_price[]' ||
+                    name === 'edit_unit_price' ||
+                    name === 'unit_price' ||
+                    name === 'cost_price' ||
+                    name.startsWith('product_unit_price_')) {
+                    return true;
+                }
+                const id = el.id || '';
+                if (id === 'edit-unit-price' ||
+                    id === 'quick_unit_price_input' ||
+                    id === 'quick_cost_price_input' ||
+                    id === 'edit_product_unit_price' ||
+                    id === 'edit_product_cost_price') {
+                    return true;
+                }
+                const td = el.closest('td');
+                if (td && td.parentElement) {
+                    const table = td.closest('table');
+                    if (table) {
+                        const cellIdx = td.cellIndex;
+                        const th = table.querySelector(`thead tr th:nth-child(${cellIdx + 1})`);
+                        if (th && /\b(Rate|Unit Price|Cost Price)\b/i.test(th.textContent || '')) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+
+            function cleanRateString(str) {
+                if (!str) return '';
+                let clean = '';
+                let hasDot = false;
+                for (let i = 0; i < str.length; i++) {
+                    const ch = str[i];
+                    if (ch >= '0' && ch <= '9') {
+                        clean += ch;
+                    } else if (ch === '.' && !hasDot) {
+                        clean += '.';
+                        hasDot = true;
+                    }
+                }
+                return clean;
+            }
+
+            // 1. Block keypresses of any special characters, e, E, +, -, letters
+            document.addEventListener('keydown', function (e) {
+                if (!isRateInput(e.target)) return;
+
+                // Allow standard shortcuts (Ctrl/Cmd + C, V, A, Z, etc.)
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+                // Allow navigation and editing keys
+                const allowedControlKeys = [
+                    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+                    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                    'Home', 'End'
+                ];
+                if (allowedControlKeys.includes(e.key)) return;
+
+                // Allow digits 0-9
+                if (/^[0-9]$/.test(e.key)) return;
+
+                // Allow single decimal point
+                if (e.key === '.') {
+                    const val = e.target.value || '';
+                    if (!val.includes('.')) return;
+                    try {
+                        const s = e.target.selectionStart;
+                        const end = e.target.selectionEnd;
+                        if (s !== null && end !== null && s !== end) {
+                            const sel = val.substring(s, end);
+                            if (sel.includes('.')) return;
+                        }
+                    } catch (_) {}
+                }
+
+                // Disallow everything else (special characters, e, E, +, -, letters)
+                e.preventDefault();
+            }, true);
+
+            // 2. Intercept paste to strip any special characters, currency symbols, commas, etc.
+            document.addEventListener('paste', function (e) {
+                if (!isRateInput(e.target)) return;
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+                const clean = cleanRateString(pasted);
+                if (!clean) return;
+
+                const input = e.target;
+                const val = input.value || '';
+                let nextVal = clean;
+                try {
+                    const s = input.selectionStart ?? val.length;
+                    const end = input.selectionEnd ?? val.length;
+                    nextVal = cleanRateString(val.slice(0, s) + clean + val.slice(end));
+                } catch (_) {
+                    nextVal = clean;
+                }
+                input.value = nextVal;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }, true);
+
+            // 3. Fallback input event sanitizer for virtual keyboards/IME/autofill
+            document.addEventListener('input', function (e) {
+                if (!isRateInput(e.target)) return;
+                const val = e.target.value;
+                if (typeof val === 'string' && (/[^0-9.]/.test(val) || (val.match(/\./g) || []).length > 1)) {
+                    e.target.value = cleanRateString(val);
+                }
+            }, true);
+
+            // 4. Prevent drag-and-drop of text containing special characters
+            document.addEventListener('drop', function (e) {
+                if (!isRateInput(e.target)) return;
+                e.preventDefault();
+                const dropped = e.dataTransfer?.getData('text') || '';
+                const clean = cleanRateString(dropped);
+                if (!clean) return;
+                e.target.value = clean;
+                e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            }, true);
+        })();
+    </script>
+
+    <!-- Global Phone Input Protection: Disallow letters, special characters, and enforce 10-digit limit -->
+    <script>
+        (function () {
+            function isPhoneInput(el) {
+                if (!el || el.tagName !== 'INPUT') return false;
+                const type = (el.type || '').toLowerCase();
+                if (type === 'tel') return true;
+                if (el.classList.contains('phone-input')) return true;
+                const name = (el.getAttribute('name') || '').toLowerCase();
+                const id = (el.id || '').toLowerCase();
+                if (name === 'phone' || id === 'phone' || name.includes('phone') || id.includes('phone')) return true;
+                return false;
+            }
+
+            function cleanPhoneDigits(str) {
+                if (!str) return '';
+                let digits = str.replace(/\D/g, '');
+                if (digits.length > 10 && digits.startsWith('91')) {
+                    digits = digits.slice(2);
+                }
+                return digits.slice(0, 10);
+            }
+
+            // 1. Block keypresses of letters, symbols, spaces, and enforce 10-digit limit
+            document.addEventListener('keydown', function (e) {
+                if (!isPhoneInput(e.target)) return;
+
+                // Allow standard modifier shortcuts (Ctrl/Cmd + C, V, A, Z, etc.)
+                if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+                // Allow navigation and editing keys
+                const allowedControlKeys = [
+                    'Backspace', 'Delete', 'Tab', 'Escape', 'Enter',
+                    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+                    'Home', 'End'
+                ];
+                if (allowedControlKeys.includes(e.key)) return;
+
+                // Allow digits 0-9
+                if (/^[0-9]$/.test(e.key)) {
+                    const input = e.target;
+                    const val = input.value || '';
+                    const digits = val.replace(/\D/g, '');
+                    try {
+                        const s = input.selectionStart;
+                        const end = input.selectionEnd;
+                        const selectedDigits = (s !== null && end !== null && s !== end)
+                            ? val.slice(s, end).replace(/\D/g, '').length
+                            : 0;
+                        if ((digits.length - selectedDigits) >= 10) {
+                            e.preventDefault();
+                            return;
+                        }
+                    } catch (_) {
+                        if (digits.length >= 10) {
+                            e.preventDefault();
+                            return;
+                        }
+                    }
+                    return;
+                }
+
+                // Disallow everything else (letters, symbols, punctuation, spaces)
+                e.preventDefault();
+            }, true);
+
+            // 2. Intercept paste to sanitize to clean 10-digit number
+            document.addEventListener('paste', function (e) {
+                if (!isPhoneInput(e.target)) return;
+                e.preventDefault();
+                const pasted = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+                const clean = cleanPhoneDigits(pasted);
+                if (!clean) return;
+
+                const input = e.target;
+                const val = input.value || '';
+                let nextDigits = clean;
+                try {
+                    const s = input.selectionStart ?? val.length;
+                    const end = input.selectionEnd ?? val.length;
+                    const before = val.slice(0, s).replace(/\D/g, '');
+                    const after = val.slice(end).replace(/\D/g, '');
+                    nextDigits = cleanPhoneDigits(before + clean + after);
+                } catch (_) {
+                    nextDigits = clean;
+                }
+                if (val.includes(' ') && nextDigits.length > 5) {
+                    input.value = nextDigits.slice(0, 5) + ' ' + nextDigits.slice(5);
+                } else {
+                    input.value = nextDigits;
+                }
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }, true);
+
+            // 3. Fallback input event sanitizer (for virtual keyboards/IME/autofill)
+            document.addEventListener('input', function (e) {
+                if (!isPhoneInput(e.target)) return;
+                const val = e.target.value;
+                if (typeof val !== 'string') return;
+                const hasInvalidChars = /[^0-9\s+\-]/.test(val);
+                const digitsCount = val.replace(/\D/g, '').length;
+                if (hasInvalidChars || digitsCount > 10) {
+                    const clean = cleanPhoneDigits(val);
+                    if (val.includes(' ') && clean.length > 5) {
+                        e.target.value = clean.slice(0, 5) + ' ' + clean.slice(5);
+                    } else {
+                        e.target.value = clean;
+                    }
+                }
+            }, true);
+
+            // 4. Prevent drag and drop of invalid text
+            document.addEventListener('drop', function (e) {
+                if (!isPhoneInput(e.target)) return;
+                e.preventDefault();
+                const dropped = e.dataTransfer?.getData('text') || '';
+                const clean = cleanPhoneDigits(dropped);
+                if (!clean) return;
+                if (e.target.value && e.target.value.includes(' ') && clean.length > 5) {
+                    e.target.value = clean.slice(0, 5) + ' ' + clean.slice(5);
+                } else {
+                    e.target.value = clean;
+                }
+                e.target.dispatchEvent(new Event('input', { bubbles: true }));
+                e.target.dispatchEvent(new Event('change', { bubbles: true }));
+            }, true);
+        })();
     </script>
 
     {% block extra_js %}{% endblock %}

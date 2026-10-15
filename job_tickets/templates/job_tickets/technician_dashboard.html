@@ -371,11 +371,18 @@ document.addEventListener('DOMContentLoaded', function() {
         const deviceDesc = data.device || 'New Repair Ticket';
         const custDesc = data.customer_name ? `Customer: ${data.customer_name}` : '';
 
+        const jobUrl = `/technician-dashboard/${encodeURIComponent(jobCode)}/`;
+
         if (window.Notification && Notification.permission === 'granted') {
-            new Notification('New Job Assigned: ' + jobCode, {
+            const notif = new Notification('New Job Assigned: ' + jobCode, {
                 body: `${deviceDesc}\n${custDesc}`,
-                icon: '/static/img/logo.png'
+                icon: '/static/img/logo.png',
+                data: { url: jobUrl }
             });
+            notif.onclick = function () {
+                window.focus();
+                window.location.href = jobUrl;
+            };
         } else if (window.Notification && Notification.permission === 'default') {
             Notification.requestPermission();
         }
@@ -384,7 +391,6 @@ document.addEventListener('DOMContentLoaded', function() {
         toast.className = 'toast align-items-center text-white bg-primary border-0 show shadow-lg position-fixed top-0 end-0 m-3';
         toast.style.zIndex = '9999';
         toast.style.minWidth = '340px';
-        const jobUrl = `/technician/job/${jobCode}/`;
         toast.innerHTML = `
             <div class="d-flex p-3">
                 <div class="me-3 fs-3 text-warning">
@@ -392,8 +398,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="flex-grow-1">
                     <div class="fw-bold fs-6">New Job Assigned!</div>
-                    <div class="text-white small mt-1"><strong>${jobCode}</strong> &bull; ${deviceDesc}</div>
-                    ${custDesc ? `<div class="text-white-50 small">${custDesc}</div>` : ''}
+                    <div class="text-white small mt-1"><strong>${escapeHtml(jobCode)}</strong> &bull; ${escapeHtml(deviceDesc)}</div>
+                    ${custDesc ? `<div class="text-white-50 small">${escapeHtml(custDesc)}</div>` : ''}
                     <div class="mt-2 d-flex gap-2">
                         <a href="${jobUrl}" class="btn btn-sm btn-light text-primary py-0 px-2 fw-semibold">View Job</a>
                         <button type="button" class="btn btn-sm btn-outline-light py-0 px-2 close-btn">Dismiss</button>

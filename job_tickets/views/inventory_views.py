@@ -1,6 +1,8 @@
+import json
 from .helpers import *  # noqa: F401,F403
 from .helpers import (
     _attach_inventory_credit_to_bill_summaries,
+    _build_cash_flow_chart_data,
     _build_inventory_bill_summaries,
     _build_inventory_dashboard_metrics,
     _build_inventory_party_directory,
@@ -31,7 +33,22 @@ def inventory_dashboard(request):
         FinancialAccount.objects.filter(is_active=True),
         current_workspace,
     ).order_by('-is_default_cash', '-is_default_bank', 'name')
+    initial_cash_flow = _build_cash_flow_chart_data(current_workspace, 'this_month')
+    context['initial_cash_flow_json'] = json.dumps(initial_cash_flow)
     return render(request, 'job_tickets/inventory_dashboard.html', context)
+
+
+@login_required
+def inventory_cash_flow_chart_api(request):
+    denied = _staff_access_required(request, "inventory")
+    if denied:
+        return JsonResponse({'error': 'Unauthorized'}, status=403)
+    current_workspace = getattr(request, 'current_workspace', None)
+    range_filter = (request.GET.get('range') or 'this_month').strip().lower()
+    start_date = request.GET.get('start_date')
+    end_date = request.GET.get('end_date')
+    data = _build_cash_flow_chart_data(current_workspace, range_filter, start_date, end_date)
+    return JsonResponse(data)
 
 @login_required
 @require_POST
@@ -105,16 +122,24 @@ def inventory_party_dashboard(request):
             )
 
     if request.method == 'POST' and 'add_inventory_party_submit' in request.POST:
-        party_form = InventoryPartyForm(request.POST)
-        if party_form.is_valid():
-            party = party_form.save(commit=False)
-            if not party.workspace_id:
-                party.workspace = current_workspace
-            party.save()
-            party_form.save_m2m()
-            messages.success(request, f"Party '{party.name}' added successfully.")
-            return redirect(f"{reverse('inventory_party_dashboard')}?tab={active_tab}")
-        messages.error(request, 'Please fix the highlighted errors and try again.')
+        party_name = (request.POST.get('name') or '').strip()
+        existing_party = InventoryParty.objects.filter(is_active=True, name__iexact=party_name)
+        if current_workspace:
+            existing_party = existing_party.filter(workspace=current_workspace)
+        if existing_party.exists():
+            messages.error(request, f'A party with the name "{party_name}" already exists.')
+            party_form = InventoryPartyForm(request.POST)
+        else:
+            party_form = InventoryPartyForm(request.POST)
+            if party_form.is_valid():
+                party = party_form.save(commit=False)
+                if not party.workspace_id:
+                    party.workspace = current_workspace
+                party.save()
+                party_form.save_m2m()
+                messages.success(request, f"Party '{party.name}' added successfully.")
+                return redirect(f"{reverse('inventory_party_dashboard')}?tab={active_tab}")
+            messages.error(request, 'Please fix the highlighted errors and try again.')
     else:
         party_form = InventoryPartyForm(
             initial={
@@ -199,7 +224,8 @@ def inventory_party_dashboard(request):
             'state': party.state or '',
             'country': party.country or 'India',
             'pincode': party.pincode or '',
-            'opening_balance': _money_text(party.opening_balance),
+            'opening_balance': _money_text(abs(party.opening_balance or Decimal('0.00'))),
+            'opening_balance_type': 'to_pay' if (party.opening_balance or Decimal('0.00')) < Decimal('0.00') else 'to_receive',
             'is_active': bool(party.is_active),
         }
         for bill in party.combined_history:
@@ -236,6 +262,7 @@ def inventory_party_dashboard(request):
                         'taxable_amount': _money_text(row.taxable_amount),
                         'gst_amount': _money_text(row.gst_amount),
                         'total_amount': _money_text(row.total_amount),
+                        'description': row.notes or '',
                     }
                     for row in lines
                 ],
@@ -361,8 +388,44 @@ def inventory_product_ledger(request, product_id):
     )
     opening_qty = int(product.stock_quantity or 0) - sum(int(entry.stock_effect or 0) for entry in all_entries)
 
+    opening_date = timezone.localtime(product.created_at).date() if product.created_at else None
+    if not opening_date and all_entries:
+        opening_date = all_entries[0].entry_date
+    if not opening_date:
+        opening_date = timezone.localdate()
+
+    opening_unit_price = product.cost_price or product.unit_price or Decimal('0.00')
+
     running_qty = opening_qty
     ledger_rows = []
+
+    # Include initial opening stock row if positive and matches date filter
+    if opening_qty > 0:
+        include_opening = True
+        if start_date and opening_date < start_date:
+            include_opening = False
+        if end_date and opening_date > end_date:
+            include_opening = False
+
+        if include_opening:
+            ledger_rows.append(
+                SimpleNamespace(
+                    entry=None,
+                    entry_type='opening_stock',
+                    entry_type_label='Opening Stock',
+                    entry_date=opening_date,
+                    invoice_number='Opening Stock',
+                    party=None,
+                    job_ticket=None,
+                    qty_in=int(opening_qty),
+                    qty_out=0,
+                    stock_balance=int(opening_qty),
+                    unit_price=opening_unit_price,
+                    total_amount=(Decimal(opening_qty) * opening_unit_price).quantize(Decimal('0.01')),
+                    created_by=None,
+                )
+            )
+
     for entry in all_entries:
         running_qty += int(entry.stock_effect or 0)
         if start_date and entry.entry_date < start_date:
@@ -390,7 +453,36 @@ def inventory_product_ledger(request, product_id):
             )
         )
 
-    ledger_rows.sort(key=lambda row: (row.entry_date, row.entry.id), reverse=True)
+    # If start_date was provided and opening_date was before start_date, show period opening balance
+    if start_date and opening_date < start_date:
+        prior_balance = opening_qty + sum(
+            int(entry.stock_effect or 0) for entry in all_entries if entry.entry_date < start_date
+        )
+        if prior_balance > 0:
+            ledger_rows.append(
+                SimpleNamespace(
+                    entry=None,
+                    entry_type='opening_stock',
+                    entry_type_label='Opening Stock',
+                    entry_date=start_date,
+                    invoice_number='Opening Stock',
+                    party=None,
+                    job_ticket=None,
+                    qty_in=int(prior_balance),
+                    qty_out=0,
+                    stock_balance=int(prior_balance),
+                    unit_price=opening_unit_price,
+                    total_amount=(Decimal(prior_balance) * opening_unit_price).quantize(Decimal('0.01')),
+                    created_by=None,
+                )
+            )
+
+    def _ledger_sort_key(row):
+        entry_date = getattr(row, 'entry_date', None) or date.min
+        entry_id = row.entry.id if (getattr(row, 'entry', None) and getattr(row.entry, 'id', None)) else -1
+        return (entry_date, entry_id)
+
+    ledger_rows.sort(key=_ledger_sort_key, reverse=True)
     total_in_qty = sum(row.qty_in for row in ledger_rows)
     total_out_qty = sum(row.qty_out for row in ledger_rows)
     purchase_amount = sum(
@@ -399,6 +491,10 @@ def inventory_product_ledger(request, product_id):
     )
     sales_amount = sum(
         (row.total_amount for row in ledger_rows if row.entry_type == 'sale'),
+        Decimal('0.00'),
+    )
+    total_movement_amount = sum(
+        (row.total_amount for row in ledger_rows),
         Decimal('0.00'),
     )
     current_stock_value = (Decimal(product.stock_quantity or 0) * (product.cost_price or Decimal('0.00'))).quantize(Decimal('0.01'))
@@ -413,6 +509,7 @@ def inventory_product_ledger(request, product_id):
         'total_out_qty': total_out_qty,
         'purchase_amount': purchase_amount,
         'sales_amount': sales_amount,
+        'total_movement_amount': total_movement_amount,
         'current_stock_value': current_stock_value,
     }
     return render(request, 'job_tickets/inventory_product_ledger.html', context)
@@ -463,6 +560,11 @@ def inventory_party_ledger(request, party_id):
         (bill['credit_balance_amount'] for bill in all_party_bills if bill['entry_type'] == 'sale'),
         Decimal('0.00'),
     )
+    if party.opening_balance:
+        if party.opening_balance < Decimal('0.00'):
+            payable_balance += abs(party.opening_balance)
+        elif party.opening_balance > Decimal('0.00'):
+            receivable_balance += abs(party.opening_balance)
     purchase_total = sum((bill['total_amount'] for bill in bill_rows if bill['entry_type'] == 'purchase'), Decimal('0.00'))
     sales_total = sum((bill['total_amount'] for bill in bill_rows if bill['entry_type'] == 'sale'), Decimal('0.00'))
     paid_total = sum(
@@ -496,6 +598,31 @@ def inventory_quick_add_party(request):
         return JsonResponse({'ok': False, 'error': 'Unauthorized'}, status=403)
 
     payload = request.POST.copy()
+    party_name = (payload.get('name') or '').strip()
+    if not party_name:
+        return JsonResponse({'ok': False, 'errors': ['Party name is required.']}, status=400)
+
+    workspace = getattr(request, 'current_workspace', None)
+    party_qs = InventoryParty.objects.filter(is_active=True, name__iexact=party_name)
+    if workspace:
+        party_qs = party_qs.filter(workspace=workspace)
+    if party_qs.exists():
+        return JsonResponse({'ok': False, 'errors': [f'A party with the name "{party_name}" already exists.']}, status=400)
+
+    phone = (payload.get('phone') or '').strip()
+    if phone:
+        normalized_phone, phone_error = normalize_indian_phone(phone, required=False, field_label='Phone number')
+        if phone_error:
+            return JsonResponse({'ok': False, 'errors': [phone_error]}, status=400)
+        phone = normalized_phone
+        payload['phone'] = normalized_phone
+        phone_qs = InventoryParty.objects.filter(is_active=True, phone=phone)
+        if workspace:
+            phone_qs = phone_qs.filter(workspace=workspace)
+        if phone_qs.exists():
+            existing = phone_qs.first()
+            return JsonResponse({'ok': False, 'errors': [f'A party with phone number "{phone}" already exists ({existing.name}).']}, status=400)
+
     payload['is_active'] = 'on'
     payload.setdefault('gst_registration_type', 'registered' if (payload.get('gstin') or '').strip() else 'unregistered')
     payload.setdefault('country', 'India')
@@ -521,6 +648,7 @@ def inventory_quick_add_party(request):
                 'name': party.name,
                 'phone': party.phone or '',
                 'label': label,
+                'opening_balance': float(party.opening_balance or 0),
             },
         }
     )
@@ -557,6 +685,25 @@ def inventory_quick_add_product(request):
         return JsonResponse({'ok': False, 'error': 'Unauthorized'}, status=403)
 
     payload = request.POST.copy()
+    product_name = (payload.get('name') or '').strip()
+    if not product_name:
+        return JsonResponse({'ok': False, 'errors': ['Product name is required.']}, status=400)
+
+    workspace = getattr(request, 'current_workspace', None)
+    prod_qs = Product.objects.filter(name__iexact=product_name)
+    if workspace:
+        prod_qs = prod_qs.filter(workspace=workspace)
+    if prod_qs.exists():
+        return JsonResponse({'ok': False, 'errors': [f'A product with the name "{product_name}" already exists.']}, status=400)
+
+    sku = (payload.get('sku') or '').strip()
+    if sku:
+        sku_qs = Product.objects.filter(sku__iexact=sku)
+        if workspace:
+            sku_qs = sku_qs.filter(workspace=workspace)
+        if sku_qs.exists():
+            return JsonResponse({'ok': False, 'errors': [f'A product with SKU "{sku}" already exists.']}, status=400)
+
     payload.setdefault('stock_quantity', '0')
     payload.setdefault('reserved_stock', '0')
     payload.setdefault('description', '')
@@ -567,6 +714,8 @@ def inventory_quick_add_product(request):
     payload.setdefault('purchase_price_tax_mode', 'without_tax')
     payload.setdefault('sales_price_tax_mode', 'without_tax')
     payload.setdefault('is_tax_inclusive_default', '')
+    payload.setdefault('vendor_warranty_months', '0')
+    payload.setdefault('customer_warranty_months', '0')
 
     try:
         payload.setdefault('gst_rate', str(CompanyProfile.get_profile(getattr(request, 'current_workspace', None)).gst_rate or Decimal('18.00')))
@@ -598,6 +747,8 @@ def inventory_quick_add_product(request):
     )
     product.stock_quantity = 0
     product.save()
+    if product.category:
+        ItemCategory.get_or_create_category(product.category, workspace=product.workspace)
 
     return JsonResponse(
         {
@@ -605,6 +756,9 @@ def inventory_quick_add_product(request):
             'product': {
                 'id': product.id,
                 'name': product.name,
+                'sku': product.sku or '',
+                'category': product.category or '',
+                'brand': product.brand or '',
                 'stock_quantity': int(product.stock_quantity or 0),
                 'label': f"{product.name} (Stock: {int(product.stock_quantity or 0)})",
                 'cost_price': format(product.cost_price, '.2f'),
@@ -612,6 +766,7 @@ def inventory_quick_add_product(request):
                 'gst_rate': format(product.gst_rate, '.2f'),
                 'tax_category': product.tax_category,
                 'bin_location': product.bin_location or '',
+                'description': product.description or '',
                 'has_serial_tracking': bool(product.has_serial_tracking),
                 'vendor_warranty_months': product.vendor_warranty_months or 0,
                 'customer_warranty_months': product.customer_warranty_months or 0,
@@ -962,6 +1117,7 @@ def product_dashboard(request):
     redirect_target = 'inventory_product_dashboard' if current_url_name == 'inventory_product_dashboard' else 'product_dashboard'
 
     query = (request.GET.get('q') or '').strip()
+    category_filter = (request.GET.get('category') or '').strip()
     current_workspace = getattr(request, 'current_workspace', None)
     products = scope_to_workspace(Product.objects.all(), current_workspace)
 
@@ -974,6 +1130,8 @@ def product_dashboard(request):
             Q(hsn_sac_code__icontains=query) |
             Q(uqc__icontains=query)
         )
+    if category_filter:
+        products = products.filter(category__iexact=category_filter)
 
     latest_purchase_entry = InventoryEntry.objects.filter(
         product=OuterRef('pk'),
@@ -1088,6 +1246,9 @@ def product_dashboard(request):
             product.profit_amount = None
             product.margin_percent = None
 
+        # Stock Value computation
+        product.stock_value = (Decimal(max(0, stock_qty)) * cost).quantize(Decimal('0.01'))
+
     if request.method == 'POST':
         if 'update_reserved_stock_submit' in request.POST:
             is_async_request = request.headers.get('X-Botgi-Async') == '1'
@@ -1141,29 +1302,39 @@ def product_dashboard(request):
             return redirect(redirect_target)
 
         if 'add_product_submit' in request.POST:
-            product_form = ProductForm(request.POST)
-            if product_form.is_valid():
-                gst_rate = effective_tax_rate(
-                    product_form.cleaned_data.get('gst_rate'),
-                    product_form.cleaned_data.get('tax_category'),
-                )
-                product = product_form.save(commit=False)
-                product.cost_price = _normalize_tax_mode_price(
-                    product_form.cleaned_data.get('cost_price'),
-                    product_form.cleaned_data.get('purchase_price_tax_mode'),
-                    gst_rate,
-                )
-                product.unit_price = _normalize_tax_mode_price(
-                    product_form.cleaned_data.get('unit_price'),
-                    product_form.cleaned_data.get('sales_price_tax_mode'),
-                    gst_rate,
-                )
-                if not product.workspace_id:
-                    product.workspace = getattr(request, 'current_workspace', None)
-                product.save()
-                messages.success(request, f"Product '{product.name}' added successfully.")
-                return redirect(redirect_target)
-            messages.error(request, "Please fix the errors and try again.")
+            product_name = (request.POST.get('name') or '').strip()
+            existing_prod = Product.objects.filter(name__iexact=product_name)
+            if current_workspace:
+                existing_prod = existing_prod.filter(workspace=current_workspace)
+            if existing_prod.exists():
+                messages.error(request, f'A product with the name "{product_name}" already exists.')
+                product_form = ProductForm(request.POST)
+            else:
+                product_form = ProductForm(request.POST)
+                if product_form.is_valid():
+                    gst_rate = effective_tax_rate(
+                        product_form.cleaned_data.get('gst_rate'),
+                        product_form.cleaned_data.get('tax_category'),
+                    )
+                    product = product_form.save(commit=False)
+                    product.cost_price = _normalize_tax_mode_price(
+                        product_form.cleaned_data.get('cost_price'),
+                        product_form.cleaned_data.get('purchase_price_tax_mode'),
+                        gst_rate,
+                    )
+                    product.unit_price = _normalize_tax_mode_price(
+                        product_form.cleaned_data.get('unit_price'),
+                        product_form.cleaned_data.get('sales_price_tax_mode'),
+                        gst_rate,
+                    )
+                    if not product.workspace_id:
+                        product.workspace = getattr(request, 'current_workspace', None)
+                    product.save()
+                    if product.category:
+                        ItemCategory.get_or_create_category(product.category, workspace=product.workspace)
+                    messages.success(request, f"Product '{product.name}' added successfully.")
+                    return redirect(redirect_target)
+                messages.error(request, "Please fix the errors and try again.")
         elif 'edit_product_submit' in request.POST:
             product_id = request.POST.get('product_id')
             product = scope_to_workspace(
@@ -1192,6 +1363,8 @@ def product_dashboard(request):
                     gst_rate,
                 )
                 edited_product.save()
+                if edited_product.category:
+                    ItemCategory.get_or_create_category(edited_product.category, workspace=edited_product.workspace)
                 messages.success(request, f"Product '{edited_product.name}' updated successfully.")
                 return redirect(redirect_target)
             else:
@@ -1207,9 +1380,15 @@ def product_dashboard(request):
                 messages.error(request, "Selected product was not found.")
                 return redirect(redirect_target)
 
+            cost_raw = (request.POST.get('cost_price') or '').strip()
+            unit_raw = (request.POST.get('unit_price') or '').strip()
+            if (cost_raw and not RATE_CLEAN_REGEX.match(cost_raw)) or (unit_raw and not RATE_CLEAN_REGEX.match(unit_raw)):
+                messages.error(request, "Special characters are not allowed in price/rate fields.")
+                return redirect(redirect_target)
+
             try:
-                raw_cost = Decimal(request.POST.get('cost_price') or '0.00')
-                raw_unit = Decimal(request.POST.get('unit_price') or '0.00')
+                raw_cost = Decimal(cost_raw or '0.00')
+                raw_unit = Decimal(unit_raw or '0.00')
             except Exception:
                 messages.error(request, "Please enter valid numeric prices.")
                 return redirect(redirect_target)
@@ -1248,6 +1427,93 @@ def product_dashboard(request):
                 product.delete()
                 messages.success(request, f"Product '{prod_name}' deleted successfully.")
             return redirect(redirect_target)
+        elif 'add_category_submit' in request.POST:
+            is_async = request.headers.get('X-Botgi-Async') == '1' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            cat_name = (request.POST.get('category_name') or '').strip()
+            cat_desc = (request.POST.get('category_description') or '').strip()
+            if not cat_name:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': 'Category name cannot be empty.'}, status=400)
+                messages.error(request, 'Category name cannot be empty.')
+                return redirect(redirect_target)
+
+            existing = ItemCategory.objects.filter(workspace=current_workspace, name__iexact=cat_name).first()
+            if existing:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': f"Category '{cat_name}' already exists."}, status=400)
+                messages.error(request, f"Category '{cat_name}' already exists.")
+                return redirect(redirect_target)
+
+            cat = ItemCategory.objects.create(
+                workspace=current_workspace,
+                name=cat_name,
+                description=cat_desc,
+            )
+            if is_async:
+                return JsonResponse({
+                    'ok': True,
+                    'message': f"Category '{cat.name}' created successfully.",
+                    'category': {'id': cat.id, 'name': cat.name, 'description': cat.description, 'product_count': 0}
+                })
+            messages.success(request, f"Category '{cat.name}' created successfully.")
+            return redirect(redirect_target)
+        elif 'edit_category_submit' in request.POST:
+            is_async = request.headers.get('X-Botgi-Async') == '1' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            cat_id = request.POST.get('category_id')
+            new_name = (request.POST.get('category_name') or '').strip()
+            cat_desc = (request.POST.get('category_description') or '').strip()
+
+            cat = ItemCategory.objects.filter(pk=cat_id, workspace=current_workspace).first()
+            if not cat:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': 'Category not found.'}, status=404)
+                messages.error(request, 'Category not found.')
+                return redirect(redirect_target)
+
+            if not new_name:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': 'Category name cannot be empty.'}, status=400)
+                messages.error(request, 'Category name cannot be empty.')
+                return redirect(redirect_target)
+
+            conflict = ItemCategory.objects.filter(workspace=current_workspace, name__iexact=new_name).exclude(pk=cat.pk).first()
+            if conflict:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': f"Another category named '{new_name}' already exists."}, status=400)
+                messages.error(request, f"Another category named '{new_name}' already exists.")
+                return redirect(redirect_target)
+
+            old_name = cat.name
+            cat.name = new_name
+            cat.description = cat_desc
+            cat.save()
+
+            if old_name.lower() != new_name.lower():
+                Product.objects.filter(workspace=current_workspace, category__iexact=old_name).update(category=new_name)
+
+            if is_async:
+                return JsonResponse({'ok': True, 'message': f"Category updated to '{cat.name}'."})
+            messages.success(request, f"Category updated to '{cat.name}'.")
+            return redirect(redirect_target)
+        elif 'delete_category_submit' in request.POST:
+            is_async = request.headers.get('X-Botgi-Async') == '1' or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            cat_id = request.POST.get('category_id')
+
+            cat = ItemCategory.objects.filter(pk=cat_id, workspace=current_workspace).first()
+            if not cat:
+                if is_async:
+                    return JsonResponse({'ok': False, 'message': 'Category not found.'}, status=404)
+                messages.error(request, 'Category not found.')
+                return redirect(redirect_target)
+
+            cat_name = cat.name
+            Product.objects.filter(workspace=current_workspace, category__iexact=cat_name).update(category='')
+            cat.delete()
+
+            if is_async:
+                return JsonResponse({'ok': True, 'message': f"Category '{cat_name}' deleted."})
+            messages.success(request, f"Category '{cat_name}' deleted.")
+            return redirect(redirect_target)
         else:
             product_form = ProductForm()
     else:
@@ -1260,14 +1526,23 @@ def product_dashboard(request):
         reserved_stock__gt=0,
         stock_quantity__lte=F('reserved_stock'),
     ).count()
+    categories = ItemCategory.get_categories_with_counts(workspace=current_workspace)
+    total_stock_quantity = sum(int(p.stock_quantity or 0) for p in product_rows)
+    total_stock_value = sum((getattr(p, 'stock_value', None) or Decimal('0.00')) for p in product_rows)
+
     context = {
         'products': product_rows,
         'product_form': product_form,
         'query': query,
+        'category_filter': category_filter,
+        'selected_category': category_filter,
+        'categories': categories,
         'total_products': products_scope.count(),
         'in_stock_count': in_stock_count,
         'reserved_alert_count': reserved_alert_count,
         'out_of_stock_count': out_of_stock_count,
+        'total_stock_quantity': total_stock_quantity,
+        'total_stock_value': total_stock_value,
         'from_inventory': current_url_name == 'inventory_product_dashboard',
     }
     return render(request, 'job_tickets/product_dashboard.html', context)
@@ -1337,4 +1612,49 @@ def inventory_track_serial(request):
             'notes': item.notes or '',
         },
     })
+
+
+@login_required
+def inventory_pincode_lookup(request, pincode):
+    denied = _staff_access_required(request, "inventory")
+    if denied:
+        return denied
+
+    code = (pincode or '').strip()
+    if not code.isdigit() or len(code) != 6:
+        return JsonResponse({'success': False, 'error': 'Invalid PIN code. Must be 6 digits.'}, status=400)
+
+    cache_key = f"pincode_lookup_{code}"
+    cached = cache.get(cache_key)
+    if cached:
+        return JsonResponse(cached)
+
+    import urllib.request
+    import json
+
+    url = f"https://api.postalpincode.in/pincode/{code}"
+    req = urllib.request.Request(
+        url,
+        headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+            if payload and isinstance(payload, list) and payload[0].get('Status') == 'Success':
+                post_offices = payload[0].get('PostOffice') or []
+                if post_offices:
+                    district = post_offices[0].get('District') or ''
+                    state = post_offices[0].get('State') or ''
+                    result = {
+                        'success': True,
+                        'city': district,
+                        'state': state,
+                        'pincode': code,
+                    }
+                    cache.set(cache_key, result, 86400 * 7)
+                    return JsonResponse(result)
+    except Exception:
+        pass
+
+    return JsonResponse({'success': False, 'error': 'Location not found for this PIN code.'}, status=404)
 

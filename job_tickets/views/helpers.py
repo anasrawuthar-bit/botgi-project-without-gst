@@ -15,6 +15,7 @@ from ..access_control import (
     user_has_staff_access,
 )
 from datetime import datetime, timedelta, date
+import calendar
 from django.db.models import Max, Q, Sum, Count, F, DecimalField, Value, OuterRef, Subquery, IntegerField, ExpressionWrapper, Case, When, DateTimeField
 from ..models import (
     Assignment,
@@ -33,6 +34,7 @@ from ..models import (
     InventoryCreditPayment,
     InventoryEntry,
     InventoryParty,
+    ItemCategory,
     InventoryNumberSequence,
     InventoryVendorCredit,
     InventoryVendorCreditApplication,
@@ -92,6 +94,13 @@ from urllib.parse import urlencode, urlsplit, quote
 PRODUCT_SALE_LOG_PATTERN = re.compile(
     r'^Product Sale - (?P<name>.+?) \(Qty: (?P<qty>\d+)\)(?: \[PROD#(?P<product_id>\d+)\])?$'
 )
+
+RATE_CLEAN_REGEX = re.compile(r'^\d+(\.\d+)?$')
+
+def validate_rate_no_special_chars(raw_value, label="Rate"):
+    text = (raw_value or '').strip()
+    if text and not RATE_CLEAN_REGEX.match(text):
+        raise ValueError(f"{label}: special characters are not allowed in rate.")
 
 JOB_PRESET_FIELDS = ('device_type', 'device_brand', 'reported_issue', 'additional_items')
 MOBILE_JWT_EXP_SECONDS = 60 * 60 * 24 * 7  # 7 days
@@ -2684,14 +2693,16 @@ def _parse_inventory_decimal(raw_value, label, default='0.00'):
     except (InvalidOperation, TypeError, ValueError):
         raise ValueError(label)
 
-def _collect_inventory_bill_lines(product_ids, quantities, unit_prices, gst_rates, serials_list=None, workspace=None):
+def _collect_inventory_bill_lines(product_ids, quantities, unit_prices, gst_rates, serials_list=None, descriptions_list=None, workspace=None):
     serials_list = serials_list or []
+    descriptions_list = descriptions_list or []
     max_lines = max(
         len(product_ids),
         len(quantities),
         len(unit_prices),
         len(gst_rates),
         len(serials_list),
+        len(descriptions_list),
     )
 
     def get_row_value(values, idx):
@@ -2707,8 +2718,9 @@ def _collect_inventory_bill_lines(product_ids, quantities, unit_prices, gst_rate
         unit_price_raw = get_row_value(unit_prices, idx)
         gst_raw = get_row_value(gst_rates, idx)
         serials_raw = get_row_value(serials_list, idx)
+        desc_raw = get_row_value(descriptions_list, idx)
 
-        if not any([product_id, qty_raw, unit_price_raw, gst_raw, serials_raw]):
+        if not any([product_id, qty_raw, unit_price_raw, gst_raw, serials_raw, desc_raw]):
             continue
 
         line_no = idx + 1
@@ -2722,6 +2734,8 @@ def _collect_inventory_bill_lines(product_ids, quantities, unit_prices, gst_rate
         if quantity <= 0:
             raise ValueError(f"Line {line_no}: quantity must be greater than zero.")
 
+        if unit_price_raw:
+            validate_rate_no_special_chars(unit_price_raw, f"Line {line_no}")
         unit_price = _parse_inventory_decimal(unit_price_raw, f"Line {line_no}: invalid unit price.")
         if unit_price < 0:
             raise ValueError(f"Line {line_no}: unit price cannot be negative.")
@@ -2764,6 +2778,7 @@ def _collect_inventory_bill_lines(product_ids, quantities, unit_prices, gst_rate
                 'line_amount': Decimal(quantity) * unit_price,
                 'gst_rate': gst_rate,
                 'serials': parsed_serials,
+                'description': desc_raw,
             }
         )
 
@@ -2821,7 +2836,8 @@ def _apply_inventory_bill_discount(line_items, bill_discount_amount, bill_notes)
             'unit_price': line['unit_price'],
             'discount_amount': line_discounts[idx],
             'gst_rate': line['gst_rate'],
-            'notes': bill_notes,
+            'notes': line.get('description') or bill_notes,
+            'description': line.get('description', ''),
             'serials': line.get('serials', []),
         }
         for idx, line in enumerate(line_items)
@@ -3026,6 +3042,7 @@ def _process_inventory_grouped_bill_edit(request, *, entry_type):
         request.POST.getlist('edit_line_quantity[]'),
         request.POST.getlist('edit_line_unit_price[]'),
         request.POST.getlist('edit_line_gst_rate[]'),
+        descriptions_list=request.POST.getlist('edit_line_description[]'),
         workspace=current_workspace,
     )
     final_line_items = _apply_inventory_bill_discount(
@@ -3210,6 +3227,7 @@ def _record_inventory_entries(
     job_ticket=None,
     existing_bill=None,
     initial_payment=None,
+    bill_notes=None,
 ):
     if not line_items:
         raise ValueError("Add at least one product line.")
@@ -3229,7 +3247,10 @@ def _record_inventory_entries(
             workspace,
         )
         normalized_invoice_date = invoice_date if entry_type == 'purchase' else None
-        shared_notes = next(((line.get('notes') or '').strip() for line in line_items if (line.get('notes') or '').strip()), '')
+        if bill_notes is not None and str(bill_notes).strip():
+            shared_notes = str(bill_notes).strip()
+        else:
+            shared_notes = next(((line.get('notes') or '').strip() for line in line_items if (line.get('notes') or '').strip()), '')
 
         if existing_bill:
             bill = InventoryBill.objects.select_for_update().get(pk=existing_bill.pk)
@@ -4678,6 +4699,214 @@ def _build_inventory_dashboard_metrics(workspace=None):
         'credit_summary': credit_summary,
     }
 
+
+def _build_cash_flow_chart_data(workspace=None, range_filter='this_month', start_date_str=None, end_date_str=None):
+    today = timezone.localdate()
+    range_filter = (range_filter or 'this_month').strip().lower()
+
+    if range_filter == 'last_month':
+        first_of_this = today.replace(day=1)
+        end_date = first_of_this - timedelta(days=1)
+        start_date = end_date.replace(day=1)
+        agg_mode = 'day'
+        range_label = end_date.strftime('%B %Y')
+    elif range_filter == 'this_quarter':
+        q = (today.month - 1) // 3
+        q_start = q * 3 + 1
+        q_end = q_start + 2
+        start_date = date(today.year, q_start, 1)
+        _, last_day = calendar.monthrange(today.year, q_end)
+        end_date = date(today.year, q_end, last_day)
+        agg_mode = 'day'
+        range_label = f"Q{q + 1} {today.year}"
+    elif range_filter == 'last_quarter':
+        q = (today.month - 1) // 3
+        if q == 0:
+            lq_year = today.year - 1
+            q_start, q_end = 10, 12
+            lq_num = 4
+        else:
+            lq_year = today.year
+            q_start = (q - 1) * 3 + 1
+            q_end = q_start + 2
+            lq_num = q
+        start_date = date(lq_year, q_start, 1)
+        _, last_day = calendar.monthrange(lq_year, q_end)
+        end_date = date(lq_year, q_end, last_day)
+        agg_mode = 'day'
+        range_label = f"Q{lq_num} {lq_year}"
+    elif range_filter == 'this_year':
+        start_date = date(today.year, 1, 1)
+        end_date = date(today.year, 12, 31)
+        agg_mode = 'month'
+        range_label = f"Year {today.year}"
+    elif range_filter == 'last_year':
+        start_date = date(today.year - 1, 1, 1)
+        end_date = date(today.year - 1, 12, 31)
+        agg_mode = 'month'
+        range_label = f"Year {today.year - 1}"
+    elif range_filter == 'custom':
+        start_date = None
+        end_date = None
+        if start_date_str:
+            try:
+                start_date = datetime.strptime(start_date_str.strip(), '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                start_date = None
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str.strip(), '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                end_date = None
+        if not start_date or not end_date:
+            start_date = today.replace(day=1)
+            _, last_day = calendar.monthrange(today.year, today.month)
+            end_date = today.replace(day=last_day)
+        if start_date > end_date:
+            start_date, end_date = end_date, start_date
+        span_days = (end_date - start_date).days
+        agg_mode = 'month' if span_days > 90 else 'day'
+        range_label = f"{start_date.strftime('%b %d, %Y')} – {end_date.strftime('%b %d, %Y')}"
+    else:
+        start_date = today.replace(day=1)
+        _, last_day = calendar.monthrange(today.year, today.month)
+        end_date = today.replace(day=last_day)
+        agg_mode = 'day'
+        range_label = today.strftime('%B %Y')
+
+    labels = []
+    sales_list = []
+    purchases_list = []
+    sales_qty_list = []
+    purchases_qty_list = []
+
+    entries_scope = scope_to_workspace(InventoryEntry.objects.all(), workspace)
+
+    if agg_mode == 'day':
+        cur = start_date
+        date_map = {}
+        while cur <= end_date:
+            date_map[cur] = {
+                'sales': Decimal('0.00'),
+                'purchases': Decimal('0.00'),
+                'sales_qty': 0,
+                'purchases_qty': 0,
+            }
+            cur += timedelta(days=1)
+
+        entries_qs = (
+            entries_scope.filter(
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+                entry_type__in=['sale', 'purchase'],
+            )
+            .values('entry_date', 'entry_type')
+            .annotate(
+                total_amt=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
+                total_qty=Coalesce(Sum('quantity'), 0),
+            )
+        )
+
+        for row in entries_qs:
+            d = row['entry_date']
+            if d in date_map:
+                if row['entry_type'] == 'sale':
+                    date_map[d]['sales'] += row['total_amt']
+                    date_map[d]['sales_qty'] += row['total_qty']
+                elif row['entry_type'] == 'purchase':
+                    date_map[d]['purchases'] += row['total_amt']
+                    date_map[d]['purchases_qty'] += row['total_qty']
+
+        for d, vals in date_map.items():
+            labels.append(d.strftime('%b %d'))
+            s = float(vals['sales'])
+            p = float(vals['purchases'])
+            sales_list.append(round(s, 2))
+            purchases_list.append(round(p, 2))
+            sales_qty_list.append(int(vals['sales_qty']))
+            purchases_qty_list.append(int(vals['purchases_qty']))
+
+    else:
+        cur = start_date.replace(day=1)
+        month_keys = []
+        month_map = {}
+        while cur <= end_date:
+            k = (cur.year, cur.month)
+            month_keys.append(k)
+            month_map[k] = {
+                'label': cur.strftime('%b %Y') if start_date.year != end_date.year else cur.strftime('%b'),
+                'sales': Decimal('0.00'),
+                'purchases': Decimal('0.00'),
+                'sales_qty': 0,
+                'purchases_qty': 0,
+            }
+            _, days_in_cur = calendar.monthrange(cur.year, cur.month)
+            cur = cur + timedelta(days=days_in_cur)
+
+        entries_qs = (
+            entries_scope.filter(
+                entry_date__gte=start_date,
+                entry_date__lte=end_date,
+                entry_type__in=['sale', 'purchase'],
+            )
+            .values('entry_date', 'entry_type')
+            .annotate(
+                total_amt=Coalesce(Sum('total_amount', output_field=DecimalField()), Decimal('0.00')),
+                total_qty=Coalesce(Sum('quantity'), 0),
+            )
+        )
+
+        for row in entries_qs:
+            d = row['entry_date']
+            k = (d.year, d.month)
+            if k in month_map:
+                if row['entry_type'] == 'sale':
+                    month_map[k]['sales'] += row['total_amt']
+                    month_map[k]['sales_qty'] += row['total_qty']
+                elif row['entry_type'] == 'purchase':
+                    month_map[k]['purchases'] += row['total_amt']
+                    month_map[k]['purchases_qty'] += row['total_qty']
+
+        for k in month_keys:
+            vals = month_map[k]
+            labels.append(vals['label'])
+            s = float(vals['sales'])
+            p = float(vals['purchases'])
+            sales_list.append(round(s, 2))
+            purchases_list.append(round(p, 2))
+            sales_qty_list.append(int(vals['sales_qty']))
+            purchases_qty_list.append(int(vals['purchases_qty']))
+
+    total_sales = round(sum(sales_list), 2)
+    total_purchases = round(sum(purchases_list), 2)
+    total_sales_qty = sum(sales_qty_list)
+    total_purchases_qty = sum(purchases_qty_list)
+
+    return {
+        'labels': labels,
+        'sales': sales_list,
+        'purchases': purchases_list,
+        'sales_qty': sales_qty_list,
+        'purchases_qty': purchases_qty_list,
+        'total_sales': total_sales,
+        'total_purchases': total_purchases,
+        'total_sales_qty': total_sales_qty,
+        'total_purchases_qty': total_purchases_qty,
+        # Backward-compatibility aliases
+        'inflow': sales_list,
+        'outflow': purchases_list,
+        'net': [round(s - p, 2) for s, p in zip(sales_list, purchases_list)],
+        'total_inflow': total_sales,
+        'total_outflow': total_purchases,
+        'net_cash_flow': round(total_sales - total_purchases, 2),
+        'range_label': range_label,
+        'range_filter': range_filter,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d'),
+        'aggregation': agg_mode,
+    }
+
+
 def _build_inventory_party_directory(query='', start_date=None, end_date=None, workspace=None):
     parties = scope_to_workspace(InventoryParty.objects.all(), workspace)
 
@@ -4771,9 +5000,15 @@ def _build_inventory_party_directory(query='', start_date=None, end_date=None, w
             party.sale_count = stats.get('sale_count', 0)
             party.sale_amount = stats.get('sale_amount', Decimal('0.00'))
             party.sale_return_count = stats.get('sale_return_count', 0)
-            party.sale_return_amount = stats.get('sale_return_amount', Decimal('0.00'))
-            party.credit_payable_amount = stats.get('credit_payable_amount', Decimal('0.00'))
-            party.credit_receivable_amount = stats.get('credit_receivable_amount', Decimal('0.00'))
+            payable = stats.get('credit_payable_amount', Decimal('0.00'))
+            receivable = stats.get('credit_receivable_amount', Decimal('0.00'))
+            if party.opening_balance:
+                if party.opening_balance < Decimal('0.00'):
+                    payable += abs(party.opening_balance)
+                elif party.opening_balance > Decimal('0.00'):
+                    receivable += abs(party.opening_balance)
+            party.credit_payable_amount = payable
+            party.credit_receivable_amount = receivable
 
             party.purchase_history = recent_map.get(party.id, {}).get('purchase', [])
             party.purchase_return_history = recent_map.get(party.id, {}).get('purchase_return', [])
@@ -4990,6 +5225,7 @@ def _build_inventory_register_snapshot(
                         'max_quantity': int(src.quantity or 0),
                         'unit_price': src.unit_price or Decimal('0.00'),
                         'gst_rate': src.gst_rate or Decimal('0.00'),
+                        'notes': src.notes or '',
                     }
                 else:
                     row['max_quantity'] += int(src.quantity or 0)
@@ -5210,29 +5446,73 @@ def _inventory_entry_dashboard(request, entry_type):
     config = INVENTORY_ENTRY_CONFIG[entry_type]
     current_workspace = getattr(request, 'current_workspace', None)
     query = (request.GET.get('q') or '').strip()
+    date_filter = (request.GET.get('date_filter') or '').strip().lower()
     start_date_raw = (request.GET.get('start_date') or '').strip()
     end_date_raw = (request.GET.get('end_date') or '').strip()
     payment_status_filter = (request.GET.get('payment_status') or 'all').strip().lower()
     if payment_status_filter not in {'all', 'credit', 'part_paid', 'paid'}:
         payment_status_filter = 'all'
+    category_filter = (request.GET.get('category') or '').strip()
 
+    if not date_filter:
+        if start_date_raw or end_date_raw:
+            date_filter = 'custom'
+        else:
+            date_filter = 'this_month'
+
+    today = timezone.localdate()
     start_date = None
     end_date = None
-    if start_date_raw:
-        try:
-            start_date = datetime.strptime(start_date_raw, '%Y-%m-%d').date()
-        except ValueError:
-            start_date = None
-            start_date_raw = ''
-    if end_date_raw:
-        try:
-            end_date = datetime.strptime(end_date_raw, '%Y-%m-%d').date()
-        except ValueError:
-            end_date = None
-            end_date_raw = ''
-    if start_date and end_date and start_date > end_date:
-        start_date, end_date = end_date, start_date
-        start_date_raw, end_date_raw = end_date_raw, start_date_raw
+
+    if date_filter == 'this_month':
+        start_date = today.replace(day=1)
+        _, last_day = calendar.monthrange(today.year, today.month)
+        end_date = today.replace(day=last_day)
+        start_date_raw = start_date.strftime('%Y-%m-%d')
+        end_date_raw = end_date.strftime('%Y-%m-%d')
+    elif date_filter == 'last_month':
+        first_of_this_month = today.replace(day=1)
+        last_day_of_last_month = first_of_this_month - timedelta(days=1)
+        start_date = last_day_of_last_month.replace(day=1)
+        end_date = last_day_of_last_month
+        start_date_raw = start_date.strftime('%Y-%m-%d')
+        end_date_raw = end_date.strftime('%Y-%m-%d')
+    elif date_filter == 'quarterly':
+        q_start_month = ((today.month - 1) // 3) * 3 + 1
+        q_end_month = q_start_month + 2
+        start_date = date(today.year, q_start_month, 1)
+        _, last_day = calendar.monthrange(today.year, q_end_month)
+        end_date = date(today.year, q_end_month, last_day)
+        start_date_raw = start_date.strftime('%Y-%m-%d')
+        end_date_raw = end_date.strftime('%Y-%m-%d')
+    elif date_filter == 'all':
+        start_date = None
+        end_date = None
+        start_date_raw = ''
+        end_date_raw = ''
+    elif date_filter == 'custom':
+        if start_date_raw:
+            try:
+                start_date = datetime.strptime(start_date_raw, '%Y-%m-%d').date()
+            except ValueError:
+                start_date = None
+                start_date_raw = ''
+        if end_date_raw:
+            try:
+                end_date = datetime.strptime(end_date_raw, '%Y-%m-%d').date()
+            except ValueError:
+                end_date = None
+                end_date_raw = ''
+        if start_date and end_date and start_date > end_date:
+            start_date, end_date = end_date, start_date
+            start_date_raw, end_date_raw = end_date_raw, start_date_raw
+    else:
+        date_filter = 'this_month'
+        start_date = today.replace(day=1)
+        _, last_day = calendar.monthrange(today.year, today.month)
+        end_date = today.replace(day=last_day)
+        start_date_raw = start_date.strftime('%Y-%m-%d')
+        end_date_raw = end_date.strftime('%Y-%m-%d')
 
     entries = scope_to_workspace(
         InventoryEntry.objects.filter(entry_type=entry_type),
@@ -5252,6 +5532,8 @@ def _inventory_entry_dashboard(request, entry_type):
         entries = entries.filter(entry_date__gte=start_date)
     if end_date:
         entries = entries.filter(entry_date__lte=end_date)
+    if category_filter:
+        entries = entries.filter(product__category__iexact=category_filter)
 
     source_bill = None
     source_bill_lines = []
@@ -5306,6 +5588,7 @@ def _inventory_entry_dashboard(request, entry_type):
                         'max_quantity': int(src.quantity or 0),
                         'unit_price': src.unit_price or Decimal('0.00'),
                         'gst_rate': src.gst_rate or Decimal('0.00'),
+                        'notes': src.notes or '',
                     }
                 else:
                     row['max_quantity'] += int(src.quantity or 0)
@@ -5321,6 +5604,7 @@ def _inventory_entry_dashboard(request, entry_type):
             auto_open_add_modal = True
 
     line_entry_error = None
+    submitted_lines_data = []
     default_gst_rate = Decimal('18.00')
     bill_discount_value = '0.00'
     bill_notes_value = ''
@@ -5372,6 +5656,7 @@ def _inventory_entry_dashboard(request, entry_type):
                         request.POST.getlist('line_unit_price[]'),
                         request.POST.getlist('line_gst_rate[]'),
                         serials_list=request.POST.getlist('line_serials[]'),
+                        descriptions_list=request.POST.getlist('line_description[]'),
                         workspace=current_workspace,
                     )
                     final_line_items = _apply_inventory_bill_discount(
@@ -5390,6 +5675,7 @@ def _inventory_entry_dashboard(request, entry_type):
                         invoice_number=invoice_number,
                         line_items=final_line_items,
                         initial_payment=initial_payment,
+                        bill_notes=bill_notes,
                     )
                     shared_bill_number = created_entries[0].invoice_number if created_entries else invoice_number
                     created_bill = created_entries[0].bill if created_entries and created_entries[0].bill_id else None
@@ -5404,11 +5690,58 @@ def _inventory_entry_dashboard(request, entry_type):
                     if entry_type == 'sale' and created_bill:
                         redirect_target = f"{redirect_target}?just_recorded_bill={created_bill.id}"
                     return redirect(redirect_target)
-                except ValueError as exc:
-                    line_entry_error = str(exc)
+                except (ValueError, ValidationError) as exc:
+                    if hasattr(exc, 'message_dict'):
+                        msgs = []
+                        for f, errs in exc.message_dict.items():
+                            msgs.append(f"{f}: {', '.join(errs)}")
+                        line_entry_error = " ; ".join(msgs)
+                    elif hasattr(exc, 'messages'):
+                        line_entry_error = " ; ".join(exc.messages)
+                    else:
+                        line_entry_error = str(exc)
                     messages.error(request, line_entry_error)
-            if not line_entry_error:
-                messages.error(request, f"{config['success_label']} was not saved. Please review the form.")
+                except Exception as exc:
+                    line_entry_error = f"An unexpected error occurred while saving: {str(exc)}"
+                    messages.error(request, line_entry_error)
+            else:
+                error_list = []
+                for field_name, errors in entry_form.errors.items():
+                    field_label = (
+                        entry_form.fields[field_name].label
+                        if field_name in entry_form.fields and entry_form.fields[field_name].label
+                        else field_name.replace('_', ' ').title()
+                    )
+                    for err in errors:
+                        error_list.append(f"{field_label}: {err}")
+                line_entry_error = " ; ".join(error_list) if error_list else "Please review the form."
+                messages.error(request, f"{config['success_label']} was not saved. {line_entry_error}")
+
+            auto_open_add_modal = True
+
+            posted_pids = request.POST.getlist('line_product_id[]')
+            posted_descs = request.POST.getlist('line_description[]')
+            posted_qtys = request.POST.getlist('line_quantity[]')
+            posted_prices = request.POST.getlist('line_unit_price[]')
+            posted_gsts = request.POST.getlist('line_gst_rate[]')
+            posted_serials = request.POST.getlist('line_serials[]')
+            submitted_lines_data = []
+            for i in range(len(posted_pids)):
+                pid = (posted_pids[i] or '').strip()
+                desc = posted_descs[i].strip() if i < len(posted_descs) else ''
+                qty = posted_qtys[i].strip() if i < len(posted_qtys) else '1'
+                price = posted_prices[i].strip() if i < len(posted_prices) else '0.00'
+                gst = posted_gsts[i].strip() if i < len(posted_gsts) else '0.00'
+                sn = posted_serials[i].strip() if i < len(posted_serials) else ''
+                if pid or desc or price != '0.00' or sn:
+                    submitted_lines_data.append({
+                        'product_id': pid,
+                        'description': desc,
+                        'quantity': qty,
+                        'unit_price': price,
+                        'gst_rate': gst,
+                        'serials': sn,
+                    })
         elif request.POST.get('inventory_entry_edit_submit') == entry_type:
             try:
                 result = _process_inventory_grouped_bill_edit(request, entry_type=entry_type)
@@ -5539,6 +5872,8 @@ def _inventory_entry_dashboard(request, entry_type):
                         if quantity <= 0:
                             raise ValueError(f"Line {line_no}: quantity must be greater than zero.")
 
+                        if unit_price_raw:
+                            validate_rate_no_special_chars(unit_price_raw, f"Line {line_no}")
                         unit_price = parse_decimal(unit_price_raw, f"Line {line_no}: invalid unit price.")
                         if unit_price < 0:
                             raise ValueError(f"Line {line_no}: unit price cannot be negative.")
@@ -5735,6 +6070,9 @@ def _inventory_entry_dashboard(request, entry_type):
 
                 if unit_price_raw == '':
                     messages.error(request, 'Rate is required.')
+                    return redirect(config['url_name'])
+                if not RATE_CLEAN_REGEX.match(unit_price_raw):
+                    messages.error(request, 'Special characters are not allowed in rate.')
                     return redirect(config['url_name'])
                 try:
                     new_unit_price = Decimal(unit_price_raw)
@@ -5951,7 +6289,8 @@ def _inventory_entry_dashboard(request, entry_type):
         default_gst_rate = Decimal('18.00')
 
     if request.method == 'POST' and request.POST.get('inventory_entry_submit') == entry_type:
-        entry_form = InventoryEntryForm(request.POST, entry_type=entry_type)
+        # entry_form was already instantiated and validated above; keep it.
+        pass
     else:
         initial_data = {
             'entry_date': timezone.localdate(),
@@ -6029,8 +6368,12 @@ def _inventory_entry_dashboard(request, entry_type):
 
         register_rows = [bill for bill in register_rows if bill_matches_payment_filter(bill)]
 
-    entry_count_value = len(register_rows)
-    register_empty_colspan = 11 if entry_type in {'purchase', 'sale'} else 9
+    if entry_type == 'sale':
+        register_empty_colspan = 11
+    elif entry_type == 'purchase':
+        register_empty_colspan = 10
+    else:
+        register_empty_colspan = 8
     register_total_quantity = sum((int(bill.get('total_quantity') or 0) for bill in register_rows), 0)
     register_total_amount = sum((bill.get('total_amount') or Decimal('0.00') for bill in register_rows), Decimal('0.00'))
     register_paid_total = sum((bill.get('credit_paid_amount') or Decimal('0.00') for bill in register_rows), Decimal('0.00'))
@@ -6080,6 +6423,7 @@ def _inventory_entry_dashboard(request, entry_type):
                     'taxable_amount': money_text(row.taxable_amount),
                     'gst_amount': money_text(row.gst_amount),
                     'total_amount': money_text(row.total_amount),
+                    'description': row.notes or '',
                 }
                 for row in lines
             ],
@@ -6141,6 +6485,7 @@ def _inventory_entry_dashboard(request, entry_type):
             'gst_rate': float(p.effective_gst_rate or Decimal('18.00')),
             'category': p.category or '',
             'brand': p.brand or '',
+            'description': p.description or '',
             'bin_location': p.bin_location or '',
             'has_serial_tracking': bool(p.has_serial_tracking),
             'vendor_warranty_months': p.vendor_warranty_months or 0,
@@ -6229,10 +6574,14 @@ def _inventory_entry_dashboard(request, entry_type):
         'register_is_grouped': register_is_grouped,
         'register_empty_colspan': register_empty_colspan,
         'query': query,
+        'category_filter': category_filter,
+        'selected_category': category_filter,
+        'item_categories': ItemCategory.get_categories_with_counts(workspace=current_workspace),
+        'date_filter': date_filter,
         'start_date': start_date_raw,
         'end_date': end_date_raw,
         'payment_status_filter': payment_status_filter,
-        'entry_count': entry_count_value,
+        'entry_count': len(register_rows),
         'total_quantity': register_total_quantity,
         'total_amount': register_total_amount,
         'register_paid_total': register_paid_total,
@@ -6255,6 +6604,7 @@ def _inventory_entry_dashboard(request, entry_type):
         'source_bill_lines': source_bill_lines,
         'source_bill_mode': bool(source_bill_lines),
         'auto_open_add_modal': auto_open_add_modal,
+        'submitted_lines_data': submitted_lines_data,
         'sale_invoice_preview': sale_invoice_preview,
         'inventory_bill_payload': inventory_bill_payload,
         'show_add_entry_button': entry_type not in {'purchase_return', 'sale_return'},

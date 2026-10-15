@@ -251,21 +251,27 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_DIRS = [
-    BASE_DIR / 'job_tickets/static',
-]
+# Static assets live in job_tickets/static and are discovered by Django's
+# AppDirectoriesFinder. Adding that same folder to STATICFILES_DIRS registers
+# every asset twice, causing collectstatic duplicate-path warnings.
 
-# WhiteNoise configuration for static files
-STATICFILES_STORAGE = env(
-    'DJANGO_STATICFILES_STORAGE',
-    default=(
-        'django.contrib.staticfiles.storage.StaticFilesStorage'
-        if RUNNING_TESTS
-        else 'whitenoise.storage.CompressedStaticFilesStorage'
-    ),
-)
+# Django 5.2 configures static storage through STORAGES. Keep WhiteNoise's
+# compressed storage usable even when a deployment has not generated a
+# manifest yet; this avoids turning missing collectstatic output into a 500.
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': (
+            'django.contrib.staticfiles.storage.StaticFilesStorage'
+            if RUNNING_TESTS
+            else 'whitenoise.storage.CompressedStaticFilesStorage'
+        ),
+    },
+}
 WHITENOISE_MANIFEST_STRICT = env.bool('WHITENOISE_MANIFEST_STRICT', default=False)
 
 # Media files (uploads)

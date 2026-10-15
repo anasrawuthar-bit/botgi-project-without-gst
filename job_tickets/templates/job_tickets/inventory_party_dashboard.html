@@ -279,37 +279,16 @@
             {% include "job_tickets/_inventory_sidebar.html" %}
         </div>
         <div class="col-lg-9 col-xl-9 inventory-shell-main-col">
-            <!-- Header Row -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div>
-                    <h1 class="section-title mb-1"><i class="fas fa-users me-2 text-primary"></i>Party Master</h1>
-                    <p class="mb-0 text-muted">Maintain supplier and customer master records, track balances, and inspect transaction billing history.</p>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#addPartyModal">
-                        <i class="fas fa-user-plus me-1"></i>Add New Party
-                    </button>
-                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-secondary btn-sm shadow-sm">
-                        <i class="fas fa-plus me-1"></i>New Purchase Entry
-                    </a>
-                </div>
-            </div>
-
             <!-- Party Catalog Main Container -->
             <div class="card-box h-100 party-catalog-box bg-white p-3">
-                <!-- Controls Bar: Title, Filter Pills, Search, Date Range and View Mode -->
-                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                <!-- Top Controls Bar: Title, Filter Pills, Action Buttons -->
+                <div class="d-flex justify-content-between align-items-center mb-2.5 gap-3 flex-wrap">
+                    <!-- Left: Title & Filter Pills (with live counts and balances) -->
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="mb-0 fw-bold text-dark me-2"><i class="fas fa-address-book me-2 text-primary"></i>Party Directory</h5>
+                        <h5 class="section-title mb-0 fw-bold text-dark me-2"><i class="fas fa-users me-2 text-primary"></i>Party Master</h5>
                         <div class="party-filter-nav d-inline-flex flex-wrap" role="group" aria-label="Party status filter">
                             <button type="button" class="party-filter-btn active" data-party-filter="all" title="Show all parties">
                                 <span class="filter-btn-title">All <span class="filter-count">({{ total_parties }})</span></span>
-                            </button>
-                            <button type="button" class="party-filter-btn" data-party-filter="supplier" title="Filter suppliers">
-                                <span class="filter-btn-title">Suppliers <span class="filter-count">({{ supplier_count }})</span></span>
-                            </button>
-                            <button type="button" class="party-filter-btn" data-party-filter="customer" title="Filter customers">
-                                <span class="filter-btn-title">Customers <span class="filter-count">({{ customer_count }})</span></span>
                             </button>
                             <button type="button" class="party-filter-btn party-filter-pay" data-party-filter="to_pay" title="Filter parties with payables">
                                 <span class="filter-btn-title">To Pay <span class="filter-count">({{ parties_with_payables }})</span></span>
@@ -321,36 +300,50 @@
                             </button>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
+
+                    <!-- Right: Action Buttons -->
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-primary btn-sm shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addPartyModal">
+                            <i class="fas fa-user-plus me-1"></i>Add New Party
+                        </button>
+                        <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-outline-primary btn-sm shadow-sm text-nowrap">
+                            <i class="fas fa-plus me-1"></i>New Purchase Entry
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Second Row: Search, Date Filter Toggle, and View Mode Switcher -->
+                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                    <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 500px;">
                         <!-- Live Search -->
-                        <div class="input-group input-group-sm" style="min-width: 220px;">
+                        <div class="input-group input-group-sm flex-grow-1" style="min-width: 180px;">
                             <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                            <input type="text" id="party-live-search" class="form-control border-start-0 ps-0" placeholder="Search name, phone, GSTIN..." value="{{ query }}">
+                            <input type="text" id="party-live-search" class="form-control border-start-0 ps-0" placeholder="Search name, phone, city..." value="{{ query }}">
                             {% if query %}
                             <button class="btn btn-outline-secondary" type="button" id="clear-party-search-btn" title="Clear Search"><i class="fas fa-times"></i></button>
                             {% endif %}
                         </div>
 
                         <!-- Date Range Filter Toggle -->
-                        <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#party-date-filter-collapse" aria-expanded="{% if start_date or end_date %}true{% else %}false{% endif %}" title="Filter Bills by Date Range">
+                        <button class="btn btn-sm btn-outline-secondary text-nowrap" type="button" data-bs-toggle="collapse" data-bs-target="#party-date-filter-collapse" aria-expanded="{% if start_date or end_date %}true{% else %}false{% endif %}" title="Filter Bills by Date Range">
                             <i class="fas fa-calendar-days me-1"></i>Date Filter{% if start_date or end_date %} <span class="badge bg-primary ms-1">Active</span>{% endif %}
                         </button>
+                    </div>
 
-                        <!-- View Switcher (Table vs Cards) -->
-                        <div class="btn-group btn-group-sm" role="group" aria-label="View mode toggle">
-                            <button type="button" class="btn btn-outline-secondary active" id="view-mode-table-btn" title="Fit-to-Screen Table View">
-                                <i class="fas fa-table-list"></i>
-                            </button>
-                            <button type="button" class="btn btn-outline-secondary" id="view-mode-cards-btn" title="Compact Cards View">
-                                <i class="fas fa-grip"></i>
-                            </button>
-                        </div>
+                    <!-- View Switcher (Table vs Cards) -->
+                    <div class="btn-group btn-group-sm ms-auto" role="group" aria-label="View mode toggle">
+                        <button type="button" class="btn btn-outline-secondary active" id="view-mode-table-btn" title="Fit-to-Screen Table View">
+                            <i class="fas fa-table-list me-1"></i>Table
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" id="view-mode-cards-btn" title="Compact Cards View">
+                            <i class="fas fa-grip me-1"></i>Cards
+                        </button>
                     </div>
                 </div>
 
                 <!-- Date Range Collapsible Form -->
                 <div class="collapse {% if start_date or end_date %}show{% endif %} mb-3" id="party-date-filter-collapse">
-                    <form method="get" action="{% url 'inventory_party_dashboard' %}" class="card card-body bg-light border-0 p-3 mb-0" data-async-form data-async-target="#inventory-party-page">
+                    <form method="get" action="{% url 'inventory_party_dashboard' %}" class="card card-body bg-light border-0 p-3 mb-0" data-async-form data-async-target="#inventory-party-page" autocomplete="off">
                         <input type="hidden" name="q" id="hidden-search-query" value="{{ query }}">
                         <div class="row g-2 align-items-end">
                             <div class="col-sm-4 col-md-3">
@@ -380,13 +373,12 @@
 
                 <!-- Fit-to-Screen Table View -->
                 <div id="party-table-container">
-                    <div class="table-responsive inventory-scroll-pane border rounded" style="max-height: 72vh;">
+                    <div class="table-responsive inventory-scroll-pane border rounded-2" style="max-height: 72vh;">
                         <table class="table table-hover party-table align-middle mb-0">
                             <thead class="sticky-top">
                                 <tr>
-                                    <th style="min-width: 220px;">Party Name & Role</th>
+                                    <th style="min-width: 220px;">Party Name</th>
                                     <th style="min-width: 170px;">Contact & Shortcuts</th>
-                                    <th style="min-width: 160px;">GST & Tax</th>
                                     <th style="min-width: 160px;" class="text-end">Purchases & Sales</th>
                                     <th style="min-width: 140px;" class="text-center">Balance</th>
                                     <th style="min-width: 170px;" class="text-end">Actions</th>
@@ -402,31 +394,20 @@
                                     data-has-payable="{% if party.credit_payable_amount > 0 %}true{% else %}false{% endif %}"
                                     data-has-receivable="{% if party.credit_receivable_amount > 0 %}true{% else %}false{% endif %}"
                                     data-search="{{ party.name|lower }} {{ party.legal_name|lower }} {{ party.phone|default:'' }} {{ party.gstin|lower }} {{ party.city|lower }} {{ party.contact_person|lower }}">
-                                    <!-- Column 1: Party Name & Role -->
+                                    <!-- Column 1: Party Name -->
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
                                             <span class="party-name-title">{{ party.name }}</span>
-                                            {% if party.is_active %}
-                                                <span class="badge bg-success-subtle text-success border border-success-subtle py-0.5 px-1.5" style="font-size: 0.68rem;">Active</span>
-                                            {% else %}
+                                            {% if not party.is_active %}
                                                 <span class="badge bg-secondary-subtle text-secondary py-0.5 px-1.5" style="font-size: 0.68rem;">Inactive</span>
                                             {% endif %}
                                         </div>
+                                        {% if party.legal_name or party.city %}
                                         <div class="small text-muted mt-0.5">
-                                            {% if party.legal_name %}<span class="text-dark">{{ party.legal_name }}</span> &bull; {% endif %}
-                                            {{ party.city|default:"No City" }}
+                                            {% if party.legal_name %}<span class="text-dark">{{ party.legal_name }}</span>{% if party.city %} &bull; {% endif %}{% endif %}
+                                            {% if party.city %}<i class="fas fa-location-dot me-1 text-secondary" style="font-size: 0.72rem;"></i>{{ party.city }}{% endif %}
                                         </div>
-                                        <div class="mt-1">
-                                            {% if party.computed_type == 'both' %}
-                                                <span class="badge badge-role-both py-0.5 px-2" style="font-size: 0.72rem;"><i class="fas fa-arrows-split-up-and-left me-1"></i>Supplier & Customer</span>
-                                            {% elif party.computed_type == 'supplier' %}
-                                                <span class="badge badge-role-supplier py-0.5 px-2" style="font-size: 0.72rem;"><i class="fas fa-truck-field me-1"></i>Supplier</span>
-                                            {% elif party.computed_type == 'customer' %}
-                                                <span class="badge badge-role-customer py-0.5 px-2" style="font-size: 0.72rem;"><i class="fas fa-user-check me-1"></i>Customer</span>
-                                            {% else %}
-                                                <span class="badge badge-role-general py-0.5 px-2" style="font-size: 0.72rem;">General</span>
-                                            {% endif %}
-                                        </div>
+                                        {% endif %}
                                     </td>
 
                                     <!-- Column 2: Contact & Shortcuts -->
@@ -444,25 +425,13 @@
                                                 </a>
                                             </div>
                                         {% else %}
-                                            <span class="text-muted small">No phone</span>
+                                            <span class="text-muted small">&mdash;</span>
                                         {% endif %}
                                         {% if party.contact_person %}
                                             <div class="small text-muted mt-1"><i class="fas fa-user text-secondary me-1"></i>{{ party.contact_person }}</div>
                                         {% endif %}
                                     </td>
 
-                                    <!-- Column 3: GST & Tax -->
-                                    <td>
-                                        {% if party.gstin %}
-                                            <div class="font-monospace fw-semibold text-dark small">{{ party.gstin }}</div>
-                                        {% else %}
-                                            <span class="text-muted small">No GSTIN</span>
-                                        {% endif %}
-                                        <div class="small text-muted mt-0.5">
-                                            {{ party.get_gst_registration_type_display|default:"Regular" }}
-                                            {% if party.state_code %}&bull; State: {{ party.state_code }}{% endif %}
-                                        </div>
-                                    </td>
 
                                     <!-- Column 4: Purchases & Sales Volume -->
                                     <td class="text-end">
@@ -481,7 +450,7 @@
                                             </div>
                                         {% endif %}
                                         {% if party.purchase_count == 0 and party.sale_count == 0 %}
-                                            <span class="text-muted small">No transactions</span>
+                                            <span class="text-muted small">&mdash;</span>
                                         {% endif %}
                                     </td>
 
@@ -538,7 +507,7 @@
 
                                 <!-- Expandable Drawer Row for Bills -->
                                 <tr class="collapse party-drawer-row" id="party-drawer-{{ party.id }}" data-parent-party-id="{{ party.id }}">
-                                    <td colspan="6" class="p-3">
+                                    <td colspan="5" class="p-3">
                                         <div class="party-drawer-container">
                                             <div class="d-flex justify-content-between align-items-center mb-2">
                                                 <h6 class="mb-0 fw-bold text-dark small">
@@ -627,12 +596,27 @@
                                 </tr>
                                 {% endfor %}
                                 <tr id="party-empty-row" class="{% if parties %}d-none{% endif %}">
-                                    <td colspan="6" class="text-center text-muted py-5">
+                                    <td colspan="5" class="text-center text-muted py-5">
                                         <i class="fas fa-users-slash fa-2x mb-2 text-secondary d-block"></i>
                                         <p class="mb-0 fw-semibold" id="party-empty-text">No parties found.</p>
                                     </td>
                                 </tr>
                             </tbody>
+                            <tfoot class="table-light border-top">
+                                <tr class="fw-bold">
+                                    <td colspan="2" class="text-muted small text-uppercase py-2.5 ps-3">
+                                        Total Summary ({{ parties|length }} parties)
+                                    </td>
+                                    <td></td>
+                                    <td class="text-center py-2.5 font-monospace">
+                                        <div class="d-flex align-items-center justify-content-center gap-2">
+                                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" title="To Pay">&#8377;{{ total_payable|floatformat:2 }}</span>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" title="To Collect">&#8377;{{ total_receivable|floatformat:2 }}</span>
+                                        </div>
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
                         </table>
                     </div>
                 </div>
@@ -655,24 +639,21 @@
                                     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
                                         <div>
                                             <h6 class="party-name-title mb-0">{{ party.name }}</h6>
+                                            {% if party.legal_name or party.city %}
                                             <div class="small text-muted">
-                                                {% if party.legal_name %}{{ party.legal_name }} &bull; {% endif %}{{ party.city|default:"No City" }}
+                                                {% if party.legal_name %}{{ party.legal_name }}{% if party.city %} &bull; {% endif %}{% endif %}
+                                                {% if party.city %}<i class="fas fa-location-dot me-1 text-secondary" style="font-size: 0.72rem;"></i>{{ party.city }}{% endif %}
                                             </div>
+                                            {% endif %}
                                         </div>
                                         <div>
-                                            {% if party.computed_type == 'both' %}
-                                                <span class="badge badge-role-both py-0.5 px-2" style="font-size: 0.7rem;">Both</span>
-                                            {% elif party.computed_type == 'supplier' %}
-                                                <span class="badge badge-role-supplier py-0.5 px-2" style="font-size: 0.7rem;">Supplier</span>
-                                            {% elif party.computed_type == 'customer' %}
-                                                <span class="badge badge-role-customer py-0.5 px-2" style="font-size: 0.7rem;">Customer</span>
-                                            {% else %}
-                                                <span class="badge badge-role-general py-0.5 px-2" style="font-size: 0.7rem;">General</span>
+                                            {% if not party.is_active %}
+                                                <span class="badge bg-secondary-subtle text-secondary py-0.5 px-1.5" style="font-size: 0.68rem;">Inactive</span>
                                             {% endif %}
                                         </div>
                                     </div>
 
-                                    <!-- Contact & GST -->
+                                    <!-- Contact Details -->
                                     <div class="bg-light rounded p-2 mb-2 small">
                                         {% if party.phone %}
                                             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -688,9 +669,8 @@
                                                     </a>
                                                 </div>
                                             </div>
-                                        {% endif %}
-                                        {% if party.gstin %}
-                                            <div class="text-muted"><i class="fas fa-file-invoice me-1"></i>GSTIN: <span class="font-monospace text-dark">{{ party.gstin }}</span></div>
+                                        {% else %}
+                                            <div class="text-muted small">&mdash;</div>
                                         {% endif %}
                                     </div>
 
@@ -719,12 +699,12 @@
                                         <div class="col-12">
                                             {% if party.credit_payable_amount > 0 %}
                                                 <div class="badge badge-balance-pay p-2 w-100 text-center">
-                                                    <span style="font-size: 0.68rem; text-transform: uppercase;">To Pay (Supplier Balance)</span>
+                                                    <span style="font-size: 0.68rem; text-transform: uppercase;">To Pay</span>
                                                     <div class="fs-6 fw-bold">&#8377;{{ party.credit_payable_amount|floatformat:2 }}</div>
                                                 </div>
                                             {% elif party.credit_receivable_amount > 0 %}
                                                 <div class="badge badge-balance-collect p-2 w-100 text-center">
-                                                    <span style="font-size: 0.68rem; text-transform: uppercase;">To Collect (Customer Balance)</span>
+                                                    <span style="font-size: 0.68rem; text-transform: uppercase;">To Collect</span>
                                                     <div class="fs-6 fw-bold">&#8377;{{ party.credit_receivable_amount|floatformat:2 }}</div>
                                                 </div>
                                             {% else %}
@@ -812,7 +792,7 @@
                             <h5 class="modal-title" id="addPartyModalLabel"><i class="fas fa-user-plus me-2"></i>Add Party</h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             <div class="modal-body">
                                 {% csrf_token %}
                                 <input type="hidden" name="tab" value="{{ active_tab }}">
@@ -831,9 +811,64 @@
                                                 <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
                                             {% endif %}
                                         </div>
+                                        {% elif field.name == 'shipping_address' %}
+                                        <div class="col-md-6">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label mb-0" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <div class="form-check form-check-inline mb-0" style="font-size: 0.8rem;">
+                                                    <input class="form-check-input party-same-address-check" type="checkbox" id="same-address-{{ field.auto_id }}" checked>
+                                                    <label class="form-check-label text-muted" for="same-address-{{ field.auto_id }}">Same as Billing</label>
+                                                </div>
+                                            </div>
+                                            {{ field }}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% elif field.name == 'pincode' %}
+                                        <div class="col-md-6">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label mb-0" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <span class="pincode-status-text small text-muted d-none" style="font-size: 0.75rem;">
+                                                    <span class="spinner-border spinner-border-sm text-primary me-1" role="status" style="width: 0.72rem; height: 0.72rem;"></span>
+                                                    <span class="pincode-status-msg">Detecting...</span>
+                                                </span>
+                                            </div>
+                                            {{ field }}
+                                            <div class="form-text small text-muted mt-1" style="font-size: 0.72rem;"><i class="fas fa-magic me-1 text-primary"></i>Enter 6-digit PIN code to auto-detect City &amp; State</div>
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% elif field.name == 'opening_balance' %}
+                                        <div class="col-md-6">
+                                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Balance Direction</label>
+                                            <div class="d-flex align-items-center gap-3 pt-1">
+                                                <div class="form-check">
+                                                    <input class="form-check-input party-bal-type-radio" type="radio" name="{% if field.form.prefix %}{{ field.form.prefix }}-{% endif %}opening_balance_type" id="bal-type-recv-{{ field.auto_id }}" value="to_receive" checked>
+                                                    <label class="form-check-label text-success fw-semibold" for="bal-type-recv-{{ field.auto_id }}" style="cursor: pointer;">
+                                                        <i class="fas fa-arrow-down-left me-1"></i>To Receive <span class="text-muted fw-normal small">(They owe you)</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input party-bal-type-radio" type="radio" name="{% if field.form.prefix %}{{ field.form.prefix }}-{% endif %}opening_balance_type" id="bal-type-pay-{{ field.auto_id }}" value="to_pay">
+                                                    <label class="form-check-label text-danger fw-semibold" for="bal-type-pay-{{ field.auto_id }}" style="cursor: pointer;">
+                                                        <i class="fas fa-arrow-up-right me-1"></i>To Pay <span class="text-muted fw-normal small">(You owe them)</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="form-text small text-muted mt-1" style="font-size: 0.72rem;">Choose whether this opening amount is to receive from or pay to this party.</div>
+                                        </div>
                                         {% else %}
                                         <div class="col-md-6">
-                                            <label class="form-label">{{ field.label }}</label>
+                                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                             {{ field }}
                                             {% if field.errors %}
                                                 <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
@@ -864,7 +899,7 @@
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             <div class="modal-body">
                                 {% csrf_token %}
                                 <input type="hidden" name="tab" value="{{ active_tab }}">
@@ -884,9 +919,64 @@
                                                 <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
                                             {% endif %}
                                         </div>
+                                        {% elif field.name == 'shipping_address' %}
+                                        <div class="col-md-6">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label mb-0" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <div class="form-check form-check-inline mb-0" style="font-size: 0.8rem;">
+                                                    <input class="form-check-input party-same-address-check" type="checkbox" id="same-address-{{ field.auto_id }}">
+                                                    <label class="form-check-label text-muted" for="same-address-{{ field.auto_id }}">Same as Billing</label>
+                                                </div>
+                                            </div>
+                                            {{ field }}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% elif field.name == 'pincode' %}
+                                        <div class="col-md-6">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <label class="form-label mb-0" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                                <span class="pincode-status-text small text-muted d-none" style="font-size: 0.75rem;">
+                                                    <span class="spinner-border spinner-border-sm text-primary me-1" role="status" style="width: 0.72rem; height: 0.72rem;"></span>
+                                                    <span class="pincode-status-msg">Detecting...</span>
+                                                </span>
+                                            </div>
+                                            {{ field }}
+                                            <div class="form-text small text-muted mt-1" style="font-size: 0.72rem;"><i class="fas fa-magic me-1 text-primary"></i>Enter 6-digit PIN code to auto-detect City &amp; State</div>
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        {% elif field.name == 'opening_balance' %}
+                                        <div class="col-md-6">
+                                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                            {{ field }}
+                                            {% if field.errors %}
+                                                <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Balance Direction</label>
+                                            <div class="d-flex align-items-center gap-3 pt-1">
+                                                <div class="form-check">
+                                                    <input class="form-check-input party-bal-type-radio" type="radio" name="{% if field.form.prefix %}{{ field.form.prefix }}-{% endif %}opening_balance_type" id="bal-type-recv-{{ field.auto_id }}" value="to_receive" checked>
+                                                    <label class="form-check-label text-success fw-semibold" for="bal-type-recv-{{ field.auto_id }}" style="cursor: pointer;">
+                                                        <i class="fas fa-arrow-down-left me-1"></i>To Receive <span class="text-muted fw-normal small">(They owe you)</span>
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input party-bal-type-radio" type="radio" name="{% if field.form.prefix %}{{ field.form.prefix }}-{% endif %}opening_balance_type" id="bal-type-pay-{{ field.auto_id }}" value="to_pay">
+                                                    <label class="form-check-label text-danger fw-semibold" for="bal-type-pay-{{ field.auto_id }}" style="cursor: pointer;">
+                                                        <i class="fas fa-arrow-up-right me-1"></i>To Pay <span class="text-muted fw-normal small">(You owe them)</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                            <div class="form-text small text-muted mt-1" style="font-size: 0.72rem;">Choose whether this opening amount is to receive from or pay to this party.</div>
+                                        </div>
                                         {% else %}
                                         <div class="col-md-6">
-                                            <label class="form-label">{{ field.label }}</label>
+                                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
                                             {{ field }}
                                             {% if field.errors %}
                                                 <div class="text-danger small mt-1">{{ field.errors|striptags }}</div>
@@ -919,7 +1009,7 @@
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post" data-async-form data-async-target="#inventory-party-page" data-async-close-modal="#editPartyBillModal">
+                        <form method="post" data-async-form data-async-target="#inventory-party-page" data-async-close-modal="#editPartyBillModal" autocomplete="off">
                             <div class="modal-body">
                                 {% csrf_token %}
                                 <input type="hidden" name="inventory_entry_edit_submit" id="edit-party-bill-entry-type">
@@ -956,12 +1046,10 @@
                                     <table class="table table-sm table-striped align-middle mb-0">
                                         <thead>
                                             <tr>
-                                                <th style="min-width: 220px;">Product</th>
+                                                <th style="min-width: 200px;">Product</th>
+                                                <th style="min-width: 150px;">Description</th>
                                                 <th style="min-width: 90px;">Qty</th>
                                                 <th style="min-width: 120px;">Rate</th>
-                                                <th style="min-width: 130px;">Amount (Excl Tax)</th>
-                                                <th style="min-width: 90px;">GST %</th>
-                                                <th style="min-width: 120px;">Tax Amount</th>
                                                 <th style="min-width: 150px;">Total Amount</th>
                                                 <th style="min-width: 60px;">Action</th>
                                             </tr>
@@ -983,23 +1071,30 @@
                                             <select name="edit_line_product_id[]" class="form-select form-select-sm edit-party-bill-line-product">
                                                 <option value="">Select product</option>
                                                 {% for product in line_products %}
-                                                    <option value="{{ product.id }}" data-unit-price="{{ product.unit_price }}" data-cost-price="{{ product.cost_price }}">
+                                                    <option value="{{ product.id }}" data-unit-price="{{ product.unit_price }}" data-cost-price="{{ product.cost_price }}" data-description="{{ product.description|default:'' }}">
                                                         {{ product.name }} (Stock: {{ product.stock_quantity }})
                                                     </option>
                                                 {% endfor %}
                                             </select>
                                         </td>
                                         <td>
+                                            <input
+                                                type="text"
+                                                name="edit_line_description[]"
+                                                class="form-control form-control-sm edit-party-bill-line-desc"
+                                                placeholder="Item description (optional)"
+                                                autocomplete="off"
+                                            >
+                                        </td>
+                                        <td>
                                             <input type="number" min="1" step="1" name="edit_line_quantity[]" class="form-control form-control-sm edit-party-bill-line-qty" value="1">
                                         </td>
                                         <td>
-                                            <input type="number" min="0" step="0.01" name="edit_line_unit_price[]" class="form-control form-control-sm edit-party-bill-line-rate" value="0.00">
+                                            <input type="number" min="0" step="0.01" name="edit_line_unit_price[]" class="form-control form-control-sm edit-party-bill-line-rate rate-input inventory-rate-input" value="0.00" inputmode="decimal" autocomplete="off">
                                         </td>
-                                        <td class="text-end fw-semibold edit-party-bill-line-taxable">0.00</td>
-                                        <td>
-                                            <input type="number" min="0" step="0.01" name="edit_line_gst_rate[]" class="form-control form-control-sm edit-party-bill-line-gst" value="{{ default_gst_rate|floatformat:2 }}">
-                                        </td>
-                                        <td class="text-end fw-semibold edit-party-bill-line-tax">0.00</td>
+                                        <input type="hidden" name="edit_line_gst_rate[]" class="edit-party-bill-line-gst" value="0.00">
+                                        <span class="edit-party-bill-line-taxable d-none">0.00</span>
+                                        <span class="edit-party-bill-line-tax d-none">0.00</span>
                                         <td>
                                             <input type="number" min="0" step="0.01" class="form-control form-control-sm edit-party-bill-line-total" value="0.00">
                                         </td>
@@ -1023,14 +1118,14 @@
                                                 <input type="number" min="0" step="0.01" name="edit_bill_discount_amount" id="edit-party-bill-discount-amount" class="form-control form-control-sm" value="0.00">
                                             </div>
                                             <div class="d-flex justify-content-between small">
-                                                <span>Subtotal (Excl Tax)</span>
+                                                <span>Subtotal</span>
                                                 <strong id="edit-party-bill-subtotal">0.00</strong>
                                             </div>
                                             <div class="d-flex justify-content-between small">
                                                 <span>Discount</span>
                                                 <strong id="edit-party-bill-discount-view">0.00</strong>
                                             </div>
-                                            <div class="d-flex justify-content-between small">
+                                            <div class="d-flex justify-content-between small d-none">
                                                 <span>Total Tax</span>
                                                 <strong id="edit-party-bill-tax-total">0.00</strong>
                                             </div>
@@ -1343,8 +1438,161 @@
             }
         }
 
+        function setupPartyLocationAndAddress(modalEl, isEdit) {
+            if (!modalEl) return;
+            const prefix = isEdit ? 'edit-' : '';
+            const addressInput = modalEl.querySelector('[name="' + prefix + 'address"]');
+            const shippingInput = modalEl.querySelector('[name="' + prefix + 'shipping_address"]');
+            const sameAddressCheck = modalEl.querySelector('.party-same-address-check');
+            const pincodeInput = modalEl.querySelector('[name="' + prefix + 'pincode"]');
+            const cityInput = modalEl.querySelector('[name="' + prefix + 'city"]');
+            const stateInput = modalEl.querySelector('[name="' + prefix + 'state"]');
+            const statusContainer = modalEl.querySelector('.pincode-status-text');
+            const statusMsg = modalEl.querySelector('.pincode-status-msg');
+
+            function syncShippingAddress() {
+                if (!sameAddressCheck || !shippingInput) return;
+                if (sameAddressCheck.checked) {
+                    if (addressInput) {
+                        shippingInput.value = addressInput.value;
+                    }
+                    shippingInput.setAttribute('readonly', 'readonly');
+                    shippingInput.classList.add('bg-light');
+                } else {
+                    shippingInput.removeAttribute('readonly');
+                    shippingInput.classList.remove('bg-light');
+                }
+            }
+
+            if (sameAddressCheck && shippingInput) {
+                sameAddressCheck.addEventListener('change', syncShippingAddress);
+                if (addressInput) {
+                    addressInput.addEventListener('input', function () {
+                        if (sameAddressCheck.checked) {
+                            shippingInput.value = addressInput.value;
+                        }
+                    });
+                }
+            }
+
+            let lookupTimeout = null;
+            let lastQueriedPin = '';
+
+            function setPincodeStatus(type, msg) {
+                if (!statusContainer || !statusMsg) return;
+                statusContainer.classList.remove('d-none', 'text-success', 'text-danger', 'text-muted');
+                const spinner = statusContainer.querySelector('.spinner-border');
+                if (type === 'loading') {
+                    if (spinner) spinner.classList.remove('d-none');
+                    statusContainer.classList.add('text-muted');
+                    statusMsg.textContent = msg || 'Detecting...';
+                } else if (type === 'success') {
+                    if (spinner) spinner.classList.add('d-none');
+                    statusContainer.classList.add('text-success');
+                    statusMsg.innerHTML = '<i class="fas fa-check-circle me-1"></i>' + (msg || 'Auto-filled');
+                    setTimeout(function () {
+                        statusContainer.classList.add('d-none');
+                    }, 4000);
+                } else if (type === 'error') {
+                    if (spinner) spinner.classList.add('d-none');
+                    statusContainer.classList.add('text-danger');
+                    statusMsg.innerHTML = '<i class="fas fa-circle-exclamation me-1"></i>' + (msg || 'Not found');
+                    setTimeout(function () {
+                        statusContainer.classList.add('d-none');
+                    }, 4000);
+                } else {
+                    statusContainer.classList.add('d-none');
+                }
+            }
+
+            async function performPincodeLookup(pin) {
+                if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) return;
+                if (pin === lastQueriedPin) return;
+                lastQueriedPin = pin;
+
+                setPincodeStatus('loading', 'Looking up location...');
+
+                try {
+                    let data = null;
+                    try {
+                        const response = await fetch('/staff/inventory/pincode-lookup/' + encodeURIComponent(pin) + '/');
+                        if (response.ok) {
+                            data = await response.json();
+                        }
+                    } catch (e) {
+                        data = null;
+                    }
+
+                    if (!data || !data.success) {
+                        const fallbackRes = await fetch('https://api.postalpincode.in/pincode/' + encodeURIComponent(pin));
+                        if (fallbackRes.ok) {
+                            const raw = await fallbackRes.json();
+                            if (Array.isArray(raw) && raw[0] && raw[0].Status === 'Success' && raw[0].PostOffice && raw[0].PostOffice.length) {
+                                data = {
+                                    success: true,
+                                    city: raw[0].PostOffice[0].District || '',
+                                    state: raw[0].PostOffice[0].State || ''
+                                };
+                            }
+                        }
+                    }
+
+                    if (data && data.success && (data.city || data.state)) {
+                        if (cityInput && data.city) {
+                            cityInput.value = data.city;
+                        }
+                        if (stateInput && data.state) {
+                            stateInput.value = data.state;
+                        }
+                        const summary = [data.city, data.state].filter(Boolean).join(', ');
+                        setPincodeStatus('success', summary ? summary : 'Detected');
+                    } else {
+                        setPincodeStatus('error', 'PIN not found');
+                    }
+                } catch (err) {
+                    setPincodeStatus('error', 'Lookup failed');
+                }
+            }
+
+            if (pincodeInput) {
+                pincodeInput.addEventListener('input', function () {
+                    const pin = (pincodeInput.value || '').trim();
+                    clearTimeout(lookupTimeout);
+                    if (pin.length === 6 && /^\d{6}$/.test(pin)) {
+                        lookupTimeout = setTimeout(function () {
+                            performPincodeLookup(pin);
+                        }, 250);
+                    } else {
+                        lastQueriedPin = '';
+                        setPincodeStatus('hide');
+                    }
+                });
+            }
+
+            modalEl._syncShippingAddress = syncShippingAddress;
+        }
+
+        const addPartyModal = document.getElementById('addPartyModal');
+        if (addPartyModal) {
+            setupPartyLocationAndAddress(addPartyModal, false);
+            addPartyModal.addEventListener('show.bs.modal', function () {
+                const addSameAddressCheck = addPartyModal.querySelector('.party-same-address-check');
+                if (addSameAddressCheck) {
+                    addSameAddressCheck.checked = true;
+                }
+                const defaultBalRadio = addPartyModal.querySelector('input[name="opening_balance_type"][value="to_receive"]');
+                if (defaultBalRadio) {
+                    defaultBalRadio.checked = true;
+                }
+                if (addPartyModal._syncShippingAddress) {
+                    addPartyModal._syncShippingAddress();
+                }
+            });
+        }
+
         const editPartyModal = document.getElementById('editPartyModal');
         if (editPartyModal) {
+            setupPartyLocationAndAddress(editPartyModal, true);
             const editPartyIdInput = editPartyModal.querySelector('#edit-party-id-input');
             const editPartySubtitle = editPartyModal.querySelector('#edit-party-modal-subtitle');
 
@@ -1392,6 +1640,21 @@
                 ].forEach(function (fieldName) {
                     setEditPartyField(fieldName, partyData[fieldName]);
                 });
+
+                const balType = partyData.opening_balance_type || 'to_receive';
+                const balRadio = editPartyModal.querySelector('input[name="edit-opening_balance_type"][value="' + balType + '"]');
+                if (balRadio) {
+                    balRadio.checked = true;
+                }
+
+                const editSameAddressCheck = editPartyModal.querySelector('.party-same-address-check');
+                const isSame = !partyData.shipping_address || (partyData.shipping_address.trim() === (partyData.address || '').trim());
+                if (editSameAddressCheck) {
+                    editSameAddressCheck.checked = isSame;
+                }
+                if (editPartyModal._syncShippingAddress) {
+                    editPartyModal._syncShippingAddress();
+                }
             }
 
             editPartyModal.addEventListener('show.bs.modal', function (event) {
@@ -1503,14 +1766,14 @@
             const taxCell = row.querySelector('.edit-party-bill-line-tax');
 
             const quantity = Math.max(parseNumber(qtyInput ? qtyInput.value : 0), 0);
-            const gstRate = Math.max(parseNumber(gstInput ? gstInput.value : 0), 0);
+            const gstRate = 0;
+            if (gstInput) gstInput.value = '0.00';
             let unitPrice = Math.max(parseNumber(rateInput ? rateInput.value : 0), 0);
 
             if (source === 'total' && totalInput) {
                 const targetTotal = Math.max(parseNumber(totalInput.value), 0);
                 if (quantity > 0) {
-                    const divisor = 1 + (gstRate / 100);
-                    unitPrice = (divisor > 0 ? targetTotal / divisor : targetTotal) / quantity;
+                    unitPrice = targetTotal / quantity;
                     if (rateInput) {
                         rateInput.value = round2(unitPrice).toFixed(2);
                     }
@@ -1518,14 +1781,14 @@
             }
 
             const taxableAmount = round2(quantity * unitPrice);
-            const taxAmount = round2((taxableAmount * gstRate) / 100);
-            const totalAmount = round2(taxableAmount + taxAmount);
+            const taxAmount = 0;
+            const totalAmount = taxableAmount;
             renderMoney(taxableCell, taxableAmount);
             renderMoney(taxCell, taxAmount);
             if (totalInput) {
                 totalInput.value = totalAmount.toFixed(2);
             }
-            return { rawAmount: taxableAmount, gstRate: gstRate };
+            return { rawAmount: taxableAmount, gstRate: 0 };
         }
 
         function recalcBill() {
@@ -1599,7 +1862,11 @@
 
             if (productSelect) {
                 productSelect.addEventListener('change', function () {
+                    const descInput = row.querySelector('.edit-party-bill-line-desc');
                     const option = productSelect.options[productSelect.selectedIndex];
+                    if (descInput && !descInput.value.trim() && option && option.dataset.description) {
+                        descInput.value = option.dataset.description;
+                    }
                     const suggestedPrice = activeEntryType === 'sale' || activeEntryType === 'sale_return'
                         ? parseNumber(option ? option.dataset.unitPrice : 0)
                         : parseNumber(option ? option.dataset.costPrice : 0);
@@ -1635,6 +1902,10 @@
             const clone = lineTemplate.content.firstElementChild.cloneNode(true);
             clone.querySelector('.edit-party-bill-line-entry-id').value = String(lineData && lineData.entry_id ? lineData.entry_id : '');
             clone.querySelector('.edit-party-bill-line-product').value = String(lineData && lineData.product_id ? lineData.product_id : '');
+            const descInput = clone.querySelector('.edit-party-bill-line-desc');
+            if (descInput) {
+                descInput.value = String(lineData && (lineData.description || lineData.notes) ? (lineData.description || lineData.notes) : '');
+            }
             clone.querySelector('.edit-party-bill-line-qty').value = String(lineData && lineData.quantity ? lineData.quantity : '1');
             clone.querySelector('.edit-party-bill-line-rate').value = String(lineData && lineData.unit_price ? lineData.unit_price : '0.00');
             clone.querySelector('.edit-party-bill-line-gst').value = String(lineData && lineData.gst_rate ? lineData.gst_rate : defaultGstRate);

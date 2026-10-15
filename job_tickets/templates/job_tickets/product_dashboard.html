@@ -87,30 +87,13 @@
             {% include "job_tickets/_inventory_sidebar.html" %}
         </div>
         <div class="col-lg-9 col-xl-9 inventory-shell-main-col">
-            <!-- Header Row -->
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-                <div>
-                    <h1 class="section-title mb-1"><i class="fas fa-boxes-stacked me-2 text-primary"></i>Inventory Products</h1>
-                    <p class="mb-0 text-muted">Manage stock items, pricing, profit margins, and inventory entries.</p>
-                </div>
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="button" class="btn btn-primary btn-sm shadow-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
-                        <i class="fas fa-plus me-1"></i>Add New Product
-                    </button>
-                    {% if not from_inventory %}
-                    <a href="{% url 'staff_dashboard' %}" class="btn btn-secondary btn-sm">
-                        <i class="fas fa-arrow-left me-1"></i>Back to Dashboard
-                    </a>
-                    {% endif %}
-                </div>
-            </div>
-
-
             <!-- Product Catalog Card -->
             <div class="card-box h-100 inventory-product-catalog bg-white p-3">
-                <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+                <!-- Top Row: Title, Filter Pills, Summary Widget, Action Buttons (No Icons) -->
+                <div class="d-flex justify-content-between align-items-center mb-2.5 gap-3 flex-wrap">
+                    <!-- Left: Title & Filter Pills -->
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="mb-0 fw-bold text-dark me-2"><i class="fas fa-list me-2 text-primary"></i>Product Catalog</h5>
+                        <h5 class="section-title mb-0 fw-bold text-dark me-2">Product Catalog</h5>
                         <div class="btn-group btn-group-sm" role="group" aria-label="Stock status filter">
                             <button type="button" class="btn btn-outline-secondary catalog-filter-btn active" data-status-filter="all">All ({{ total_products }})</button>
                             <button type="button" class="btn btn-outline-secondary catalog-filter-btn" data-status-filter="in_stock">In Stock ({{ in_stock_count }})</button>
@@ -118,11 +101,50 @@
                             <button type="button" class="btn btn-outline-secondary catalog-filter-btn" data-status-filter="reserved_alert">Reserved Alert ({{ reserved_alert_count }})</button>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="position-relative inventory-product-search">
-                            <input type="text" id="catalog-live-search" class="form-control form-control-sm ps-4" placeholder="Search product, category, SKU, HSN..." value="{{ query }}">
-                            <i class="fas fa-search position-absolute top-50 start-0 translate-middle-y ms-2.5 text-muted" style="font-size: 0.8rem;"></i>
+
+                    <!-- Center: Stock Quantity & Value Summary Widget -->
+                    <div class="d-flex align-items-center gap-3 bg-light border rounded-3 px-3 py-1.5 shadow-sm my-1">
+                        <div class="text-center px-1">
+                            <div class="text-muted fw-semibold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.03em;">Stock Quantity</div>
+                            <div class="fw-bold text-dark fs-6" id="catalog-summary-qty">
+                                <span class="qty-val">{{ total_stock_quantity }}</span> <small class="text-muted fw-normal" style="font-size: 0.72rem;">units</small>
+                            </div>
                         </div>
+                        <div class="vr" style="height: 28px; opacity: 0.25;"></div>
+                        <div class="text-center px-1">
+                            <div class="text-muted fw-semibold text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.03em;">Stock Value</div>
+                            <div class="fw-bold text-primary fs-6 font-monospace" id="catalog-summary-val">&#8377;{{ total_stock_value|floatformat:2 }}</div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Action Buttons (No Icons) -->
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-outline-primary btn-sm shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#manageCategoriesModal">
+                            Manage Categories
+                        </button>
+                        <button type="button" class="btn btn-primary btn-sm shadow-sm text-nowrap" data-bs-toggle="modal" data-bs-target="#addProductModal">
+                            Add New Product
+                        </button>
+                        {% if not from_inventory %}
+                        <a href="{% url 'staff_dashboard' %}" class="btn btn-secondary btn-sm" title="Back to Dashboard">
+                            Dashboard
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Second Row: Category Filter and Search (No Icons) -->
+                <div class="d-flex justify-content-start align-items-center mb-3 gap-2 flex-wrap">
+                    <div style="min-width: 170px; max-width: 230px;">
+                        <select id="catalog-category-filter" class="form-select form-select-sm" aria-label="Category filter">
+                            <option value="">All Categories ({{ categories|length }})</option>
+                            {% for cat in categories %}
+                                <option value="{{ cat.name|lower }}" {% if selected_category|lower == cat.name|lower %}selected{% endif %}>{{ cat.name }} ({{ cat.product_count }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div style="min-width: 220px; max-width: 340px;" class="flex-grow-1">
+                        <input type="text" id="catalog-live-search" class="form-control form-control-sm" placeholder="Search product, SKU..." value="{{ query }}" autocomplete="off" spellcheck="false">
                     </div>
                 </div>
 
@@ -131,13 +153,12 @@
                     <table class="table table-hover align-middle mb-0" id="product-catalog-table">
                         <thead>
                             <tr>
-                                <th style="width: 25%;">Product & Category</th>
-                                <th style="width: 12%;">GST / HSN</th>
+                                <th style="width: 28%;">Product & Category</th>
                                 <th style="width: 15%;">Purchase Price</th>
-                                <th style="width: 16%;">Sales Price & Margin</th>
-                                <th style="width: 14%;">Stock Status</th>
-                                <th style="width: 8%;">Reserved</th>
-                                <th class="text-end" style="width: 10%;">Actions</th>
+                                <th style="width: 17%;">Sales Price & Margin</th>
+                                <th style="width: 17%;">Stock Qty & Value</th>
+                                <th style="width: 9%;">Reserved</th>
+                                <th class="text-end" style="width: 14%;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="catalog-table-body">
@@ -148,7 +169,9 @@
                                 data-product-category="{{ product.category|default:''|lower }}" 
                                 data-product-hsn="{{ product.hsn_sac_code|default:''|lower }}" 
                                 data-product-brand="{{ product.brand|default:''|lower }}"
-                                data-product-sku="{{ product.sku|default:''|lower }}">
+                                data-product-sku="{{ product.sku|default:''|lower }}"
+                                data-stock-quantity="{{ product.stock_quantity|default:0 }}"
+                                data-stock-value="{{ product.stock_value|default:'0.00' }}">
                                 <td>
                                     <div class="fw-bold text-dark inventory-product-name">{{ product.name }}</div>
                                     <div class="d-flex align-items-center gap-1.5 flex-wrap mt-1">
@@ -171,23 +194,6 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <div class="small fw-semibold text-dark">{{ product.hsn_sac_code|default:"-" }}</div>
-                                    <div class="mt-0.5">
-                                        {% if product.tax_category == 'taxable' %}
-                                        <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle" style="font-size: 0.72rem;">{{ product.gst_rate|floatformat:0 }}% GST</span>
-                                        {% elif product.tax_category == 'exempt' %}
-                                        <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">Exempt</span>
-                                        {% elif product.tax_category == 'nil_rated' %}
-                                        <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">Nil Rated</span>
-                                        {% else %}
-                                        <span class="badge bg-light text-muted border" style="font-size: 0.72rem;">Non-GST</span>
-                                        {% endif %}
-                                    </div>
-                                    {% if product.cess_rate %}
-                                    <div class="small text-muted mt-0.5" style="font-size: 0.72rem;">+{{ product.cess_rate|floatformat:1 }}% Cess</div>
-                                    {% endif %}
-                                </td>
-                                <td>
                                     <div class="d-flex align-items-center gap-1.5 quick-price-trigger btn-quick-price" 
                                          title="Click to edit purchase and sales prices"
                                          data-bs-toggle="modal" 
@@ -204,7 +210,7 @@
                                         <i class="fas fa-truck me-1 text-secondary opacity-75"></i>{{ product.latest_purchase_party }}
                                     </div>
                                     {% else %}
-                                    <div class="small text-muted mt-0.5" style="font-size: 0.72rem;">No purchases yet</div>
+                                    <div class="small text-muted mt-0.5" style="font-size: 0.72rem;">Base Cost</div>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -222,7 +228,7 @@
                                     {% if product.margin_percent %}
                                     <div class="mt-0.5">
                                         <span class="badge bg-success-subtle text-success border border-success-subtle px-1.5 py-0.5" style="font-size: 0.72rem;" title="Gross Profit: ₹{{ product.profit_amount|floatformat:2 }} per unit">
-                                            <i class="fas fa-arrow-trend-up me-1"></i>+{{ product.margin_percent }}% (₹{{ product.profit_amount|floatformat:0 }})
+                                            +{{ product.margin_percent }}% (₹{{ product.profit_amount|floatformat:0 }})
                                         </span>
                                     </div>
                                     {% elif product.cost_price > 0 and product.unit_price == product.cost_price %}
@@ -236,28 +242,27 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if product.stock_status == 'out_of_stock' %}
                                     <div class="d-flex flex-column align-items-start">
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 fw-bold" style="font-size: 0.8rem;">
-                                            <i class="fas fa-circle-xmark me-1"></i>0 {{ product.uqc|default:'NOS' }}
+                                        {% if product.stock_status == 'out_of_stock' %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 fw-bold" style="font-size: 0.8rem;">
+                                            0 {{ product.uqc|default:'NOS' }}
                                         </span>
-                                        <span class="small text-danger fw-semibold mt-1" style="font-size: 0.72rem;">Out of Stock</span>
-                                    </div>
-                                    {% elif product.stock_status == 'reserved_alert' %}
-                                    <div class="d-flex flex-column align-items-start">
-                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 fw-bold" style="font-size: 0.8rem;">
-                                            <i class="fas fa-triangle-exclamation me-1 text-warning"></i>{{ product.stock_quantity }} {{ product.uqc|default:'NOS' }}
+                                        {% elif product.stock_status == 'reserved_alert' %}
+                                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-0.5 fw-bold" style="font-size: 0.8rem;">
+                                            {{ product.stock_quantity }} {{ product.uqc|default:'NOS' }}
                                         </span>
-                                        <span class="small text-warning-emphasis fw-semibold mt-1" style="font-size: 0.72rem;">Low Stock (≤ {{ product.reserved_stock }})</span>
-                                    </div>
-                                    {% else %}
-                                    <div class="d-flex flex-column align-items-start">
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fw-bold" style="font-size: 0.8rem;">
-                                            <i class="fas fa-circle-check me-1"></i>{{ product.stock_quantity }} {{ product.uqc|default:'NOS' }}
+                                        <span class="small text-warning-emphasis fw-semibold mt-0.5" style="font-size: 0.72rem;">Low Stock (&le; {{ product.reserved_stock }})</span>
+                                        {% else %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 fw-bold" style="font-size: 0.8rem;">
+                                            {{ product.stock_quantity }} {{ product.uqc|default:'NOS' }}
                                         </span>
-                                        <span class="small text-success fw-semibold mt-1" style="font-size: 0.72rem;">In Stock</span>
+                                        {% endif %}
+
+                                        <div class="mt-1 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.76rem;" title="Stock Valuation: {{ product.stock_quantity|default:0 }} × ₹{{ product.cost_price|default:0 }}">
+                                            <span class="text-muted">Value:</span>
+                                            <span class="fw-bold {% if product.stock_value > 0 %}text-primary{% else %}text-muted{% endif %}">&#8377;{{ product.stock_value|floatformat:2 }}</span>
+                                        </div>
                                     </div>
-                                    {% endif %}
                                 </td>
                                 <td>
                                     <div class="d-flex align-items-center gap-1">
@@ -292,7 +297,7 @@
                                             data-customer-warranty="{{ product.customer_warranty_months }}"
                                             data-description="{{ product.description|default:'' }}"
                                             data-tax-inclusive="{% if product.is_tax_inclusive_default %}1{% else %}0{% endif %}">
-                                            <i class="fas fa-pen me-1"></i>Edit
+                                            <i class="fas fa-pen"></i>
                                         </button>
                                         <a href="{% url 'inventory_product_ledger' product_id=product.id %}" class="btn btn-outline-secondary px-2 py-1" title="Product Ledger">
                                             <i class="fas fa-book-open"></i>
@@ -308,7 +313,7 @@
                             </tr>
                             <!-- Expandable Quick Transaction History Drawer -->
                             <tr class="collapse" id="product-history-{{ product.id }}">
-                                <td colspan="7" class="bg-light-subtle p-3">
+                                <td colspan="6" class="bg-light-subtle p-3">
                                     <div class="py-1">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-clock-rotate-left me-1.5 text-primary"></i>Recent Transactions for {{ product.name }}</h6>
@@ -367,13 +372,31 @@
                             </tr>
                             {% empty %}
                             <tr id="no-products-row">
-                                <td colspan="7" class="text-center py-4 text-muted">
+                                <td colspan="6" class="text-center py-4 text-muted">
                                     <i class="fas fa-boxes-stacked fa-2x mb-2 text-secondary opacity-50 d-block"></i>
                                     <div>No products found matching your filter or search.</div>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light border-top">
+                            <tr class="fw-bold">
+                                <td colspan="3" class="text-muted small text-uppercase py-2.5 ps-3">
+                                    Total Summary (<span id="tfoot-products-count">{{ products|length }}</span> products)
+                                </td>
+                                <td class="py-2.5">
+                                    <div class="d-flex flex-column align-items-start">
+                                        <span class="badge bg-dark-subtle text-dark border px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.8rem;" id="tfoot-total-qty">
+                                            {{ total_stock_quantity }} units
+                                        </span>
+                                        <div class="mt-1 font-monospace text-primary fw-bold" style="font-size: 0.82rem;" id="tfoot-total-val">
+                                            &#8377;{{ total_stock_value|floatformat:2 }}
+                                        </div>
+                                    </div>
+                                </td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
@@ -391,7 +414,7 @@
                             </div>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="product_id" id="quick_price_product_id">
                             <div class="modal-body p-4">
@@ -400,29 +423,15 @@
                                         <label class="form-label fw-semibold small text-dark">Purchase / Cost Price (₹) *</label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-light text-muted font-monospace">₹</span>
-                                            <input type="number" step="0.01" min="0" name="cost_price" id="quick_cost_price_input" class="form-control font-monospace fw-bold" required>
+                                            <input type="number" step="0.01" min="0" name="cost_price" id="quick_cost_price_input" class="form-control font-monospace fw-bold rate-input inventory-rate-input" inputmode="decimal" autocomplete="off" required>
                                         </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold small text-dark">Purchase Tax Mode</label>
-                                        <select name="purchase_price_tax_mode" id="quick_purchase_tax_mode" class="form-select">
-                                            <option value="without_tax">Without Tax (Net)</option>
-                                            <option value="with_tax">With Tax (Gross)</option>
-                                        </select>
                                     </div>
                                     <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">Selling / Retail Price (₹) *</label>
                                         <div class="input-group">
                                             <span class="input-group-text bg-light text-muted font-monospace">₹</span>
-                                            <input type="number" step="0.01" min="0" name="unit_price" id="quick_unit_price_input" class="form-control font-monospace fw-bold text-success" required>
+                                            <input type="number" step="0.01" min="0" name="unit_price" id="quick_unit_price_input" class="form-control font-monospace fw-bold text-success rate-input inventory-rate-input" inputmode="decimal" autocomplete="off" required>
                                         </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label fw-semibold small text-dark">Sales Tax Mode</label>
-                                        <select name="sales_price_tax_mode" id="quick_sales_tax_mode" class="form-select">
-                                            <option value="without_tax">Without Tax (Net)</option>
-                                            <option value="with_tax">With Tax (Gross)</option>
-                                        </select>
                                     </div>
                                 </div>
 
@@ -461,7 +470,7 @@
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             <div class="modal-body p-4">
                                 {% csrf_token %}
                                 {% if product_form.non_field_errors %}
@@ -469,6 +478,15 @@
                                         {{ product_form.non_field_errors|striptags }}
                                     </div>
                                 {% endif %}
+                                <input type="hidden" name="item_type" value="goods">
+                                <input type="hidden" name="uqc" value="NOS">
+                                <input type="hidden" name="hsn_sac_code" value="">
+                                <input type="hidden" name="tax_category" value="taxable">
+                                <input type="hidden" name="gst_rate" value="0.00">
+                                <input type="hidden" name="cess_rate" value="0.00">
+                                <input type="hidden" name="purchase_price_tax_mode" value="without_tax">
+                                <input type="hidden" name="sales_price_tax_mode" value="without_tax">
+                                <input type="hidden" name="is_tax_inclusive_default" value="False">
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">{{ product_form.name.label }}</label>
@@ -477,76 +495,33 @@
                                             <div class="text-danger small mt-1">{{ product_form.name.errors|striptags }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label class="form-label fw-semibold small text-dark">{{ product_form.category.label }}</label>
                                         {{ product_form.category }}
                                         {% if product_form.category.errors %}
                                             <div class="text-danger small mt-1">{{ product_form.category.errors|striptags }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label class="form-label fw-semibold small text-dark">{{ product_form.brand.label }}</label>
                                         {{ product_form.brand }}
                                         {% if product_form.brand.errors %}
                                             <div class="text-danger small mt-1">{{ product_form.brand.errors|striptags }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.item_type.label }}</label>
-                                        {{ product_form.item_type }}
-                                        {% if product_form.item_type.errors %}
-                                            <div class="text-danger small mt-1">{{ product_form.item_type.errors|striptags }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.uqc.label }}</label>
-                                        {{ product_form.uqc }}
-                                        {% if product_form.uqc.errors %}
-                                            <div class="text-danger small mt-1">{{ product_form.uqc.errors|striptags }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.hsn_sac_code.label }}</label>
-                                        {{ product_form.hsn_sac_code }}
-                                        {% if product_form.hsn_sac_code.errors %}
-                                            <div class="text-danger small mt-1">{{ product_form.hsn_sac_code.errors|striptags }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.tax_category.label }}</label>
-                                        {{ product_form.tax_category }}
-                                        {% if product_form.tax_category.errors %}
-                                            <div class="text-danger small mt-1">{{ product_form.tax_category.errors|striptags }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.gst_rate.label }}</label>
-                                        {{ product_form.gst_rate }}
-                                        {% if product_form.gst_rate.errors %}
-                                            <div class="text-danger small mt-1">{{ product_form.gst_rate.errors|striptags }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.cost_price.label }}</label>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold small text-dark">{{ product_form.cost_price.label }} (₹)</label>
                                         {{ product_form.cost_price }}
                                         {% if product_form.cost_price.errors %}
                                             <div class="text-danger small mt-1">{{ product_form.cost_price.errors|striptags }}</div>
                                         {% endif %}
                                     </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.purchase_price_tax_mode.label }}</label>
-                                        {{ product_form.purchase_price_tax_mode }}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.unit_price.label }}</label>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-semibold small text-dark">{{ product_form.unit_price.label }} (₹)</label>
                                         {{ product_form.unit_price }}
                                         {% if product_form.unit_price.errors %}
                                             <div class="text-danger small mt-1">{{ product_form.unit_price.errors|striptags }}</div>
                                         {% endif %}
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">{{ product_form.sales_price_tax_mode.label }}</label>
-                                        {{ product_form.sales_price_tax_mode }}
                                     </div>
                                     <div class="col-md-4">
                                         <label class="form-label fw-semibold small text-dark">{{ product_form.stock_quantity.label }}</label>
@@ -566,19 +541,11 @@
                                         <label class="form-label fw-semibold small text-dark">{{ product_form.bin_location.label }}</label>
                                         {{ product_form.bin_location }}
                                     </div>
-                                    <div class="col-md-6 d-flex align-items-center mt-3">
+                                    <div class="col-12 d-flex align-items-center mt-3">
                                         <div class="form-check">
                                             {{ product_form.has_serial_tracking }}
                                             <label class="form-check-label fw-semibold small text-dark" for="{{ product_form.has_serial_tracking.id_for_label }}">
                                                 {{ product_form.has_serial_tracking.label }}
-                                            </label>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 d-flex align-items-center mt-3">
-                                        <div class="form-check">
-                                            {{ product_form.is_tax_inclusive_default }}
-                                            <label class="form-check-label fw-semibold small text-dark" for="{{ product_form.is_tax_inclusive_default.id_for_label }}">
-                                                {{ product_form.is_tax_inclusive_default.label }}
                                             </label>
                                         </div>
                                     </div>
@@ -609,87 +576,50 @@
                             </h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post" id="edit-product-form">
+                        <form method="post" id="edit-product-form" autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="product_id" id="edit_product_id">
                             <input type="hidden" name="stock_quantity" id="edit_product_stock_quantity" value="0">
+                            <input type="hidden" name="item_type" id="edit_product_item_type" value="goods">
+                            <input type="hidden" name="uqc" id="edit_product_uqc" value="NOS">
+                            <input type="hidden" name="hsn_sac_code" id="edit_product_hsn" value="">
+                            <input type="hidden" name="tax_category" id="edit_product_tax_category" value="taxable">
+                            <input type="hidden" name="gst_rate" id="edit_product_gst_rate" value="0.00">
+                            <input type="hidden" name="cess_rate" id="edit_product_cess_rate" value="0.00">
+                            <input type="hidden" name="purchase_price_tax_mode" id="edit_product_purchase_tax_mode" value="without_tax">
+                            <input type="hidden" name="sales_price_tax_mode" id="edit_product_sales_tax_mode" value="without_tax">
+                            <input type="hidden" name="is_tax_inclusive_default" value="False">
                             <div class="modal-body p-4">
                                 <div class="row g-3">
                                     <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">Product Name *</label>
-                                        <input type="text" name="name" id="edit_product_name" class="form-control" required>
+                                        <input type="text" name="name" id="edit_product_name" class="form-control" autocomplete="off" required>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-3">
                                         <label class="form-label fw-semibold small text-dark">Category</label>
-                                        <input type="text" name="category" id="edit_product_category" class="form-control">
+                                        <input type="text" name="category" id="edit_product_category" class="form-control" list="product-category-datalist" autocomplete="off">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label fw-semibold small text-dark">Brand</label>
+                                        <input type="text" name="brand" id="edit_product_brand" class="form-control" autocomplete="off">
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label fw-semibold small text-dark">Brand</label>
-                                        <input type="text" name="brand" id="edit_product_brand" class="form-control">
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">Item Type</label>
-                                        <select name="item_type" id="edit_product_item_type" class="form-select">
-                                            <option value="goods">Goods</option>
-                                            <option value="service">Service</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-3">
-                                        <label class="form-label fw-semibold small text-dark">UQC (Unit)</label>
-                                        <input type="text" name="uqc" id="edit_product_uqc" class="form-control" placeholder="NOS, KGS...">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">HSN / SAC Code</label>
-                                        <input type="text" name="hsn_sac_code" id="edit_product_hsn" class="form-control">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">Tax Category</label>
-                                        <select name="tax_category" id="edit_product_tax_category" class="form-select">
-                                            <option value="taxable">Taxable</option>
-                                            <option value="exempt">Exempt</option>
-                                            <option value="nil_rated">Nil Rated</option>
-                                            <option value="non_gst">Non-GST</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">GST Rate (%)</label>
-                                        <input type="number" step="0.01" min="0" name="gst_rate" id="edit_product_gst_rate" class="form-control">
-                                    </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">Cess Rate (%)</label>
-                                        <input type="number" step="0.01" min="0" name="cess_rate" id="edit_product_cess_rate" class="form-control" value="0.00">
-                                    </div>
-                                    <div class="col-md-4">
                                         <label class="form-label fw-semibold small text-dark">Purchase Price (₹)</label>
-                                        <input type="number" step="0.01" min="0" name="cost_price" id="edit_product_cost_price" class="form-control font-monospace">
+                                        <input type="number" step="0.01" min="0" name="cost_price" id="edit_product_cost_price" class="form-control font-monospace rate-input inventory-rate-input" inputmode="decimal" autocomplete="off">
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">Purchase Tax Mode</label>
-                                        <select name="purchase_price_tax_mode" id="edit_product_purchase_tax_mode" class="form-select">
-                                            <option value="without_tax">Without Tax</option>
-                                            <option value="with_tax">With Tax</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">Selling Price (₹)</label>
-                                        <input type="number" step="0.01" min="0" name="unit_price" id="edit_product_unit_price" class="form-control font-monospace">
+                                        <input type="number" step="0.01" min="0" name="unit_price" id="edit_product_unit_price" class="form-control font-monospace rate-input inventory-rate-input" inputmode="decimal" autocomplete="off">
                                     </div>
-                                    <div class="col-md-4">
-                                        <label class="form-label fw-semibold small text-dark">Sales Tax Mode</label>
-                                        <select name="sales_price_tax_mode" id="edit_product_sales_tax_mode" class="form-select">
-                                            <option value="without_tax">Without Tax</option>
-                                            <option value="with_tax">With Tax</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">Reserved Stock Alert</label>
-                                        <input type="number" min="0" step="1" name="reserved_stock" id="edit_product_reserved_stock" class="form-control font-monospace">
+                                        <input type="number" min="0" step="1" name="reserved_stock" id="edit_product_reserved_stock" class="form-control font-monospace" autocomplete="off">
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-md-6">
                                         <label class="form-label fw-semibold small text-dark">Rack / Shelf / Bin</label>
-                                        <input type="text" name="bin_location" id="edit_product_bin_location" class="form-control" placeholder="Rack A - Shelf 2">
+                                        <input type="text" name="bin_location" id="edit_product_bin_location" class="form-control" placeholder="Rack A - Shelf 2" autocomplete="off">
                                     </div>
-                                    <div class="col-md-4 d-flex align-items-center mt-4">
+                                    <div class="col-12 d-flex align-items-center mt-3">
                                         <div class="form-check">
                                             <input type="checkbox" name="has_serial_tracking" id="edit_product_has_serial_tracking" class="form-check-input">
                                             <label class="form-check-label fw-semibold small text-dark" for="edit_product_has_serial_tracking">
@@ -724,14 +654,14 @@
                             </h6>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post" data-async-form data-async-target="#inventory-products-page" data-async-success="Reserved stock updated.">
+                        <form method="post" data-async-form data-async-target="#inventory-products-page" data-async-success="Reserved stock updated." autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="product_id" id="quick_res_product_id">
                             <div class="modal-body p-3">
                                 <div class="small text-muted mb-1">Product:</div>
                                 <div class="fw-bold text-dark mb-3" id="quick_res_product_name"></div>
                                 <label class="form-label fw-semibold small text-dark">Minimum Reserved Stock</label>
-                                <input type="number" name="reserved_stock" id="quick_res_stock_input" class="form-control form-control-lg font-monospace text-center fw-bold" min="0" step="1" required>
+                                <input type="number" name="reserved_stock" id="quick_res_stock_input" class="form-control form-control-lg font-monospace text-center fw-bold" min="0" step="1" autocomplete="off" required>
                                 <div class="small text-muted mt-2" style="font-size: 0.74rem;">
                                     When current stock falls to or below this number, low-stock warnings will trigger.
                                 </div>
@@ -757,7 +687,7 @@
                             </h6>
                             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <form method="post">
+                        <form method="post" autocomplete="off">
                             {% csrf_token %}
                             <input type="hidden" name="product_id" id="delete_modal_product_id">
                             <div class="modal-body p-3">
@@ -778,6 +708,178 @@
                 </div>
             </div>
 
+            <!-- Modal: Manage Item Categories -->
+            <div class="modal fade quick-pop-modal" id="manageCategoriesModal" tabindex="-1" aria-labelledby="manageCategoriesModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header py-3 px-4 bg-light border-bottom">
+                            <div>
+                                <h5 class="modal-title fw-bold text-dark mb-0" id="manageCategoriesModalLabel">
+                                    <i class="fas fa-tags me-2 text-primary"></i>Manage Item Categories
+                                </h5>
+                                <p class="text-muted small mb-0 mt-0.5">Organize your inventory with custom product categories.</p>
+                            </div>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body p-4">
+                            <!-- Quick Add Category Form -->
+                            <div class="card border rounded-3 p-3 mb-4 bg-light shadow-none">
+                                <h6 class="fw-bold text-dark mb-2"><i class="fas fa-plus-circle me-1.5 text-primary"></i>Add New Category</h6>
+                                <form method="post" id="add-category-form" class="row g-2 align-items-center" autocomplete="off">
+                                    {% csrf_token %}
+                                    <div class="col-12 col-md-5">
+                                        <input type="text" name="category_name" id="new_category_name" class="form-control form-control-sm" placeholder="Category name (e.g. Display, Battery)" required>
+                                    </div>
+                                    <div class="col-12 col-md-5">
+                                        <input type="text" name="category_description" id="new_category_description" class="form-control form-control-sm" placeholder="Optional description">
+                                    </div>
+                                    <div class="col-12 col-md-2">
+                                        <button type="submit" name="add_category_submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                            <i class="fas fa-plus me-1"></i>Add
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Existing Categories Table -->
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="fw-bold text-dark mb-0"><i class="fas fa-list me-1.5 text-secondary"></i>Existing Categories ({{ categories|length }})</h6>
+                            </div>
+                            <div class="table-responsive border rounded-2" style="max-height: 340px; overflow-y: auto;">
+                                <table class="table table-hover align-middle mb-0" id="categories-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width: 35%;">Category Name</th>
+                                            <th style="width: 35%;">Description</th>
+                                            <th style="width: 15%; text-align: center;">Products</th>
+                                            <th style="width: 15%; text-align: end;">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="categories-table-body">
+                                        {% for cat in categories %}
+                                        <tr data-category-id="{{ cat.id }}" data-category-name="{{ cat.name }}" data-category-desc="{{ cat.description|default:'' }}">
+                                            <td class="fw-bold text-dark">
+                                                <i class="fas fa-folder me-1.5 text-warning"></i>
+                                                <span class="cat-name-display">{{ cat.name }}</span>
+                                            </td>
+                                            <td class="text-muted small">
+                                                <span class="cat-desc-display">{{ cat.description|default:"-" }}</span>
+                                            </td>
+                                            <td class="text-center font-monospace">
+                                                <span class="badge bg-secondary-subtle text-secondary px-2 py-1">
+                                                    {{ cat.product_count }} items
+                                                </span>
+                                            </td>
+                                            <td class="text-end">
+                                                <div class="btn-group btn-group-sm" role="group">
+                                                    <button type="button" class="btn btn-outline-primary px-2 py-1 btn-edit-category" 
+                                                        data-category-id="{{ cat.id }}" 
+                                                        data-category-name="{{ cat.name }}" 
+                                                        data-category-description="{{ cat.description|default:'' }}"
+                                                        title="Rename Category">
+                                                        <i class="fas fa-pen"></i>
+                                                    </button>
+                                                    <button type="button" class="btn btn-outline-danger px-2 py-1 btn-delete-category" 
+                                                        data-category-id="{{ cat.id }}" 
+                                                        data-category-name="{{ cat.name }}" 
+                                                        data-product-count="{{ cat.product_count }}"
+                                                        title="Delete Category">
+                                                        <i class="fas fa-trash-can"></i>
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr id="no-categories-row">
+                                            <td colspan="4" class="text-center text-muted py-4">No categories created yet. Add your first category above!</td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer bg-light py-2 px-4 border-top">
+                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Edit / Rename Category -->
+            <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header py-2.5 px-3 bg-light border-bottom">
+                            <h6 class="modal-title fw-bold text-dark mb-0" id="editCategoryModalLabel">
+                                <i class="fas fa-pen-to-square me-1.5 text-primary"></i>Rename Category
+                            </h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="post" id="edit-category-form" autocomplete="off">
+                            {% csrf_token %}
+                            <input type="hidden" name="category_id" id="modal_edit_category_id">
+                            <div class="modal-body p-3">
+                                <div class="mb-2">
+                                    <label class="form-label fw-semibold small text-dark mb-1">Category Name *</label>
+                                    <input type="text" name="category_name" id="modal_edit_category_name" class="form-control form-control-sm" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label fw-semibold small text-dark mb-1">Description</label>
+                                    <input type="text" name="category_description" id="modal_edit_category_description" class="form-control form-control-sm">
+                                </div>
+                                <p class="text-muted small mb-0" style="font-size: 0.74rem;">
+                                    Renaming will update all associated products to this new category name.
+                                </p>
+                            </div>
+                            <div class="modal-footer bg-light py-2 px-3 border-top">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" name="edit_category_submit" class="btn btn-sm btn-primary fw-semibold">
+                                    <i class="fas fa-check-circle me-1"></i>Save
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Delete Category -->
+            <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-sm">
+                    <div class="modal-content border-0 shadow-lg">
+                        <div class="modal-header py-2.5 px-3 bg-danger text-white border-bottom">
+                            <h6 class="modal-title fw-bold mb-0" id="deleteCategoryModalLabel">
+                                <i class="fas fa-triangle-exclamation me-1.5"></i>Delete Category
+                            </h6>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="post" id="delete-category-form" autocomplete="off">
+                            {% csrf_token %}
+                            <input type="hidden" name="category_id" id="modal_delete_category_id">
+                            <div class="modal-body p-3">
+                                <p class="mb-2 text-dark">Are you sure you want to delete category:</p>
+                                <div class="fw-bold text-danger mb-2" id="modal_delete_category_name"></div>
+                                <div class="small text-muted" style="font-size: 0.76rem;" id="modal_delete_category_warning">
+                                    Products currently assigned to this category will have their category field cleared. Products will not be deleted.
+                                </div>
+                            </div>
+                            <div class="modal-footer bg-light py-2 px-3 border-top">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                                <button type="submit" name="delete_category_submit" class="btn btn-sm btn-danger fw-semibold">
+                                    <i class="fas fa-trash-can me-1"></i>Confirm Delete
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Datalist for autocomplete in product forms -->
+            <datalist id="product-category-datalist">
+                {% for cat in categories %}
+                    <option value="{{ cat.name }}">
+                {% endfor %}
+            </datalist>
+
         </div>
     </div>
 </div>
@@ -786,6 +888,7 @@
 document.addEventListener('DOMContentLoaded', function () {
     // 1. Client-side Live Search and Status Filtering
     const searchInput = document.getElementById('catalog-live-search');
+    const categorySelect = document.getElementById('catalog-category-filter');
     const tableRows = document.querySelectorAll('#catalog-table-body .product-row');
     const noProductsRow = document.getElementById('no-products-row');
     const filterBtns = document.querySelectorAll('.catalog-filter-btn');
@@ -794,7 +897,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function applyCatalogFilter() {
         const query = (searchInput ? searchInput.value : '').trim().toLowerCase();
+        const selectedCat = (categorySelect ? categorySelect.value : '').trim().toLowerCase();
         let visibleCount = 0;
+        let visibleStockQty = 0;
+        let visibleStockVal = 0.0;
 
         tableRows.forEach(row => {
             const status = row.getAttribute('data-stock-status') || '';
@@ -803,11 +909,19 @@ document.addEventListener('DOMContentLoaded', function () {
             const hsn = row.getAttribute('data-product-hsn') || '';
             const brand = row.getAttribute('data-product-brand') || '';
             const sku = row.getAttribute('data-product-sku') || '';
+            const rowQty = parseInt(row.getAttribute('data-stock-quantity') || '0', 10);
+            const rowVal = parseFloat(row.getAttribute('data-stock-value') || '0');
 
             // Status condition
             let statusMatch = true;
             if (currentStatusFilter !== 'all') {
                 statusMatch = (status === currentStatusFilter);
+            }
+
+            // Category condition
+            let categoryMatch = true;
+            if (selectedCat) {
+                categoryMatch = (cat === selectedCat);
             }
 
             // Text search condition
@@ -816,9 +930,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 searchMatch = (name.includes(query) || cat.includes(query) || hsn.includes(query) || brand.includes(query) || sku.includes(query));
             }
 
-            if (statusMatch && searchMatch) {
+            if (statusMatch && categoryMatch && searchMatch) {
                 row.style.display = '';
                 visibleCount++;
+                visibleStockQty += isNaN(rowQty) ? 0 : rowQty;
+                visibleStockVal += isNaN(rowVal) ? 0 : rowVal;
             } else {
                 row.style.display = 'none';
                 // Close any open collapse under this row
@@ -835,10 +951,36 @@ document.addEventListener('DOMContentLoaded', function () {
         if (noProductsRow) {
             noProductsRow.style.display = (visibleCount === 0) ? '' : 'none';
         }
+
+        const formattedVal = '₹' + visibleStockVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const summaryQtyEl = document.getElementById('catalog-summary-qty');
+        const summaryValEl = document.getElementById('catalog-summary-val');
+        const tfootQtyEl = document.getElementById('tfoot-total-qty');
+        const tfootValEl = document.getElementById('tfoot-total-val');
+        const tfootCountEl = document.getElementById('tfoot-products-count');
+
+        if (summaryQtyEl) {
+            summaryQtyEl.innerHTML = `<span class="qty-val">${visibleStockQty}</span> <small class="text-muted fw-normal" style="font-size: 0.72rem;">units</small>`;
+        }
+        if (summaryValEl) {
+            summaryValEl.textContent = formattedVal;
+        }
+        if (tfootQtyEl) {
+            tfootQtyEl.textContent = `${visibleStockQty} units`;
+        }
+        if (tfootValEl) {
+            tfootValEl.textContent = formattedVal;
+        }
+        if (tfootCountEl) {
+            tfootCountEl.textContent = visibleCount;
+        }
     }
 
     if (searchInput) {
         searchInput.addEventListener('input', applyCatalogFilter);
+    }
+    if (categorySelect) {
+        categorySelect.addEventListener('change', applyCatalogFilter);
     }
 
     function setStatusFilter(status) {
@@ -870,12 +1012,12 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById('edit_product_name').value = d.name || '';
             document.getElementById('edit_product_category').value = d.category || '';
             document.getElementById('edit_product_brand').value = d.brand || '';
-            document.getElementById('edit_product_item_type').value = d.itemType || 'goods';
-            document.getElementById('edit_product_uqc').value = d.uqc || '';
-            document.getElementById('edit_product_hsn').value = d.hsn || '';
-            document.getElementById('edit_product_tax_category').value = d.taxCategory || 'taxable';
-            document.getElementById('edit_product_gst_rate').value = d.gstRate || '18';
-            document.getElementById('edit_product_cess_rate').value = d.cessRate || '0.00';
+            if (document.getElementById('edit_product_item_type')) document.getElementById('edit_product_item_type').value = 'goods';
+            if (document.getElementById('edit_product_uqc')) document.getElementById('edit_product_uqc').value = 'NOS';
+            if (document.getElementById('edit_product_hsn')) document.getElementById('edit_product_hsn').value = '';
+            if (document.getElementById('edit_product_tax_category')) document.getElementById('edit_product_tax_category').value = 'taxable';
+            if (document.getElementById('edit_product_gst_rate')) document.getElementById('edit_product_gst_rate').value = '0.00';
+            if (document.getElementById('edit_product_cess_rate')) document.getElementById('edit_product_cess_rate').value = '0.00';
             document.getElementById('edit_product_cost_price').value = d.costPrice || '0';
             document.getElementById('edit_product_unit_price').value = d.unitPrice || '0';
             document.getElementById('edit_product_stock_quantity').value = d.stockQuantity || '0';
@@ -962,6 +1104,57 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     });
+
+    // 6. Category Management Modal Interactions
+    const editCategoryModalEl = document.getElementById('editCategoryModal');
+    document.querySelectorAll('.btn-edit-category').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const d = this.dataset;
+            document.getElementById('modal_edit_category_id').value = d.categoryId || '';
+            document.getElementById('modal_edit_category_name').value = d.categoryName || '';
+            document.getElementById('modal_edit_category_description').value = d.categoryDescription || '';
+            if (typeof bootstrap !== 'undefined' && editCategoryModalEl) {
+                bootstrap.Modal.getOrCreateInstance(editCategoryModalEl).show();
+            }
+        });
+    });
+
+    const deleteCategoryModalEl = document.getElementById('deleteCategoryModal');
+    document.querySelectorAll('.btn-delete-category').forEach(btn => {
+        btn.addEventListener('click', function () {
+            const d = this.dataset;
+            document.getElementById('modal_delete_category_id').value = d.categoryId || '';
+            document.getElementById('modal_delete_category_name').textContent = d.categoryName || '';
+            const cnt = parseInt(d.productCount || '0', 10);
+            const warningEl = document.getElementById('modal_delete_category_warning');
+            if (warningEl) {
+                if (cnt > 0) {
+                    warningEl.innerHTML = `<span class="text-danger fw-bold"><i class="fas fa-exclamation-circle me-1"></i>${cnt} product(s)</span> are currently assigned to this category. Their category will be cleared, but the products will not be deleted.`;
+                } else {
+                    warningEl.textContent = 'No products are currently using this category. Safe to delete.';
+                }
+            }
+            if (typeof bootstrap !== 'undefined' && deleteCategoryModalEl) {
+                bootstrap.Modal.getOrCreateInstance(deleteCategoryModalEl).show();
+            }
+        });
+    });
+
+    ['id_category', 'edit_product_category'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            const trigger = () => {
+                if (typeof input.showPicker === 'function') {
+                    try { input.showPicker(); } catch (e) {}
+                }
+            };
+            input.addEventListener('focus', trigger);
+            input.addEventListener('click', trigger);
+        }
+    });
+
+    // Run initial filter to ensure counts and totals are synced
+    applyCatalogFilter();
 });
 </script>
 {% endblock %}

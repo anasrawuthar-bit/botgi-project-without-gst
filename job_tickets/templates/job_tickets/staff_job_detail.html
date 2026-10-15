@@ -177,7 +177,7 @@
                 <i class="fas fa-id-card me-1"></i> Print Job Card
             </a>
             <a href="{% url 'job_billing_print_view' job.job_code %}" target="_blank" rel="noopener" class="btn btn-outline-dark btn-sm">
-                <i class="fas fa-file-invoice me-1"></i> Print Tax Invoice
+                <i class="fas fa-file-invoice me-1"></i> Print Invoice
             </a>
             {% if job.status != 'Closed' %}
             <a href="{% url 'job_billing_staff' job.job_code %}" class="btn btn-primary btn-sm">
@@ -361,11 +361,11 @@
                                 <div class="d-flex flex-wrap align-items-center gap-2">
                                     <span class="fw-semibold">{{ job.customer_phone }}</span>
                                     <a href="tel:+91{{ job.customer_phone }}" class="btn btn-outline-success btn-sm">
-                                        <i class="fas fa-phone"></i> Call
+                                        <i class="fas fa-phone me-1"></i> Call
                                     </a>
                                     {% if whatsapp_direct_url %}
-                                    <a href="{{ whatsapp_direct_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm" title="Chat directly with customer on WhatsApp Web / App">
-                                        <i class="fab fa-whatsapp"></i> Chat
+                                    <a href="{{ whatsapp_direct_url }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-sm text-white" title="Chat directly with customer on WhatsApp Web / App">
+                                        <i class="fab fa-whatsapp me-1 text-white"></i> Chat
                                     </a>
                                     {% endif %}
                                     <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#sendWhatsappModal" title="Send WhatsApp notification from system">

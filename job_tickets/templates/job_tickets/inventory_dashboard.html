@@ -27,23 +27,101 @@
                     <p class="inventory-hero-subtitle mb-0">Monitor stock movement, value, and risk products from one place.</p>
                 </div>
                 <div class="inventory-hero-actions d-flex flex-wrap gap-2">
-                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm">
+                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-plus me-1"></i>New Purchase
                     </a>
-                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-emerald btn-sm">
+                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-emerald btn-sm shadow-sm">
                         <i class="fas fa-cart-shopping me-1"></i>New Sale
                     </a>
-                    <a href="{% url 'inventory_product_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{% url 'inventory_product_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">
                         <i class="fas fa-boxes-stacked me-1"></i>Products
                     </a>
                 </div>
             </div>
 
-            <!-- Block 1: Warehouse & Stock Health -->
+            <!-- Block 1: Interactive Animated Sales & Purchase Dynamics Chart (Top Hero) -->
+            <div class="card-box bg-white p-3.5 inventory-card-standard mb-4 shadow-sm border rounded-3" id="inventory-cash-flow-section">
+                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap mb-3 pb-2.5 border-bottom">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <span class="inventory-section-icon text-primary"><i class="fa-solid fa-chart-line"></i></span>
+                            <h5 class="mb-0 fw-bold text-dark">Sales &amp; Purchase Dynamics</h5>
+                            <span class="badge bg-light text-muted border small" id="cashFlowActiveRangeLabel">This Month</span>
+                        </div>
+                        <p class="mb-0 small text-muted">Interactive timeline of product sales revenue and stock procurement.</p>
+                    </div>
+
+                    <!-- Right Controls: Date Range Selector & Custom Inputs -->
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <div class="d-flex align-items-center gap-2 bg-light border rounded-pill px-2.5 py-1">
+                            <span class="small text-muted fw-medium"><i class="fa-regular fa-calendar me-1"></i>Period:</span>
+                            <select id="cashFlowRangeSelect" class="form-select form-select-sm border-0 bg-transparent fw-semibold text-dark shadow-none p-0 pe-4" style="cursor: pointer; font-size: 0.84rem;">
+                                <option value="this_month" selected>This Month</option>
+                                <option value="last_month">Last Month</option>
+                                <option value="this_quarter">This Quarter</option>
+                                <option value="last_quarter">Last Quarter</option>
+                                <option value="this_year">This Year</option>
+                                <option value="last_year">Last Year</option>
+                                <option value="custom">Custom Date Range</option>
+                            </select>
+                        </div>
+
+                        <!-- Custom Date Pickers (visible only when 'custom' is selected) -->
+                        <div id="cashFlowCustomDateWrap" class="d-none d-flex align-items-center gap-1.5 bg-light border rounded-3 p-1">
+                            <input type="date" id="cashFlowCustomStart" class="form-control form-control-sm py-0.5 px-2" style="font-size: 0.8rem; width: 130px;">
+                            <span class="text-muted small">to</span>
+                            <input type="date" id="cashFlowCustomEnd" class="form-control form-control-sm py-0.5 px-2" style="font-size: 0.8rem; width: 130px;">
+                            <button type="button" id="cashFlowCustomApplyBtn" class="btn btn-primary btn-sm py-0.5 px-2.5" style="font-size: 0.8rem;">Apply</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Summary Metric Pills: Dynamic Sales & Purchases -->
+                <div class="row g-3 mb-3 align-items-center">
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center gap-3 bg-light border rounded-3 px-3.5 py-2.5">
+                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-emerald-light text-success" style="width: 38px; height: 38px; font-size: 1.05rem;">
+                                <i class="fa-solid fa-cart-shopping"></i>
+                            </span>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.03em;">Total Sales</div>
+                                    <span class="badge bg-white text-success border small" id="chartSalesCount">0 units sold</span>
+                                </div>
+                                <div class="fw-bold text-success font-monospace fs-5" id="cashFlowTotalInflow">&#8377;0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="d-flex align-items-center gap-3 bg-light border rounded-3 px-3.5 py-2.5">
+                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle rounded-3" style="width: 38px; height: 38px; font-size: 1.05rem; background-color: rgba(99, 102, 241, 0.12); color: #4f46e5;">
+                                <i class="fa-solid fa-truck-ramp-box"></i>
+                            </span>
+                            <div class="flex-grow-1">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-muted small fw-semibold text-uppercase" style="font-size: 0.7rem; letter-spacing: 0.03em;">Total Purchases</div>
+                                    <span class="badge bg-white border small" id="chartPurchasesCount" style="color: #4f46e5;">0 units received</span>
+                                </div>
+                                <div class="fw-bold font-monospace fs-5" id="cashFlowTotalOutflow" style="color: #4f46e5;">&#8377;0.00</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Canvas Area for Smooth Animated Chart -->
+                <div class="position-relative" style="min-height: 290px; height: 320px;">
+                    <canvas id="inventoryCashFlowCanvas"></canvas>
+                    <div id="cashFlowChartLoading" class="position-absolute top-50 start-50 translate-middle d-none bg-white bg-opacity-75 p-2 rounded-3 text-primary fw-medium small shadow-sm border">
+                        <i class="fa-solid fa-spinner fa-spin me-1"></i>Loading Trends...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Block 2: Stock & Inventory Health -->
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <div class="d-flex align-items-center gap-2">
                     <span class="inventory-section-icon text-primary"><i class="fa-solid fa-boxes-stacked"></i></span>
-                    <h6 class="text-uppercase fw-bold text-secondary small mb-0 tracking-wider">Warehouse &amp; Stock Health</h6>
+                    <h6 class="text-uppercase fw-bold text-secondary small mb-0 tracking-wider">Stock &amp; Inventory Health</h6>
                 </div>
                 <span class="badge bg-light text-muted border small"><i class="fa-solid fa-cube me-1 text-primary"></i>{{ product_count }} Catalog Items</span>
             </div>
@@ -55,13 +133,13 @@
                             <span class="inventory-kpi-icon bg-indigo-light text-primary"><i class="fa-solid fa-vault"></i></span>
                         </div>
                         <h3 class="inventory-kpi-value mb-1">&#8377;{{ inventory_value|floatformat:2 }}</h3>
-                        <span class="inventory-kpi-subtext text-muted"><i class="fa-solid fa-warehouse me-1"></i>Current Asset Value</span>
+                        <span class="inventory-kpi-subtext text-muted"><i class="fa-solid fa-boxes-stacked me-1"></i>Current Asset Value</span>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-3">
                     <div class="card-box inventory-kpi h-100">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Warehouse Stock</span>
+                            <span class="inventory-kpi-label">Stock</span>
                             <span class="inventory-kpi-icon bg-purple-light text-purple"><i class="fa-solid fa-boxes-stacked"></i></span>
                         </div>
                         <h3 class="inventory-kpi-value mb-1">{{ total_in_stock_qty }} <span class="fs-6 fw-normal text-muted">units</span></h3>
@@ -75,64 +153,17 @@
                 <div class="col-md-6 col-xl-3">
                     <div class="card-box inventory-kpi h-100">
                         <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Low Stock Items</span>
+                            <span class="inventory-kpi-label">Low Stock Alerts</span>
                             <span class="inventory-kpi-icon {% if low_stock_count > 0 %}bg-amber-light text-warning{% else %}bg-slate-light text-secondary{% endif %}">
                                 <i class="fa-solid fa-triangle-exclamation"></i>
                             </span>
                         </div>
                         <h3 class="inventory-kpi-value mb-1 {% if low_stock_count > 0 %}text-warning{% endif %}">{{ low_stock_count }}</h3>
-                        <span class="inventory-kpi-subtext text-muted"><i class="fa-solid fa-boxes-packing me-1"></i>Stock &le; 5 units</span>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-box inventory-kpi h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Reserved Alerts</span>
-                            <span class="inventory-kpi-icon {% if reserved_alert_count > 0 %}bg-rose-light text-danger{% else %}bg-emerald-light text-success{% endif %}">
-                                <i class="fa-solid fa-shield-halved"></i>
-                            </span>
-                        </div>
-                        <h3 class="inventory-kpi-value mb-1 {% if reserved_alert_count > 0 %}text-danger{% else %}text-success{% endif %}">{{ reserved_alert_count }}</h3>
-                        <span class="inventory-kpi-subtext text-muted"><i class="fa-solid fa-wrench me-1"></i>Jobs awaiting parts</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Block 2: Commercial & Cashflow -->
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="inventory-section-icon text-success"><i class="fa-solid fa-chart-line"></i></span>
-                    <h6 class="text-uppercase fw-bold text-secondary small mb-0 tracking-wider">Commercial &amp; Cashflow</h6>
-                </div>
-                <span class="badge bg-slate-light text-dark border">{% now "F Y" %}</span>
-            </div>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-box inventory-kpi h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Sales (Month)</span>
-                            <span class="inventory-kpi-icon bg-emerald-light text-success"><i class="fa-solid fa-cart-shopping"></i></span>
-                        </div>
-                        <h3 class="inventory-kpi-value text-success mb-1">&#8377;{{ monthly_sales_total|floatformat:2 }}</h3>
-                        <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
-                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0 fw-semibold" style="font-size: 0.72rem;" title="Gross Profit: Revenue &#8377;{{ monthly_sales_total|floatformat:2 }} - COGS &#8377;{{ monthly_sales_cogs|floatformat:2 }}">
-                                Profit: &#8377;{{ monthly_sales_profit|floatformat:0 }} ({{ monthly_sales_margin_pct }}%)
-                            </span>
-                            <span class="small text-muted font-monospace">{{ monthly_sales_qty }} sold</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-box inventory-kpi h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Purchases (Month)</span>
-                            <span class="inventory-kpi-icon bg-sky-light text-info"><i class="fa-solid fa-cart-arrow-down"></i></span>
-                        </div>
-                        <h3 class="inventory-kpi-value mb-1">&#8377;{{ monthly_purchase_total|floatformat:2 }}</h3>
-                        <div class="d-flex align-items-center gap-2 mt-1">
-                            <span class="badge bg-sky-subtle text-info border border-info-subtle px-2 py-0 font-monospace" style="font-size: 0.72rem;">
-                                {{ monthly_purchase_qty }} units received
-                            </span>
+                        <div class="d-flex align-items-center justify-content-between mt-1 small">
+                            <span class="text-muted"><i class="fa-solid fa-boxes-packing me-1"></i>Stock &le; 5 units</span>
+                            {% if reserved_alert_count > 0 %}
+                            <span class="text-danger fw-medium" title="Jobs awaiting parts">{{ reserved_alert_count }} reserved</span>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -145,20 +176,7 @@
                         <h3 class="inventory-kpi-value text-success mb-1">&#8377;{{ credit_summary.receivable_total|floatformat:2 }}</h3>
                         <div class="d-flex align-items-center justify-content-between mt-1 small">
                             <span class="text-muted">{{ credit_summary.receivable_count }} bill(s) open</span>
-                            <span class="text-warning fw-medium" title="Supplier Payables">Payable: &#8377;{{ credit_summary.payable_total|floatformat:0 }}</span>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-6 col-xl-3">
-                    <div class="card-box inventory-kpi h-100">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <span class="inventory-kpi-label">Received This Month</span>
-                            <span class="inventory-kpi-icon bg-emerald-light text-success"><i class="fa-solid fa-money-bill-transfer"></i></span>
-                        </div>
-                        <h3 class="inventory-kpi-value mb-1">&#8377;{{ credit_summary.month_received_total|floatformat:2 }}</h3>
-                        <div class="d-flex align-items-center justify-content-between mt-1 small">
-                            <span class="text-muted">Collections</span>
-                            <span class="text-secondary" title="Total Supplier Payments This Month">Paid Out: &#8377;{{ credit_summary.month_paid_total|floatformat:0 }}</span>
+                            <span class="text-secondary" title="Supplier Payables">Payable: &#8377;{{ credit_summary.payable_total|floatformat:0 }}</span>
                         </div>
                     </div>
                 </div>
@@ -166,15 +184,15 @@
 
             <div class="row g-4 mb-4">
                 <div class="col-xl-6">
-                    <div class="card-box h-100">
+                    <div class="card-box bg-white p-3 inventory-card-standard h-100">
                         <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="inventory-section-icon text-warning"><i class="fas fa-arrow-up-wide-short"></i></span>
-                                <h5 class="mb-0">To Pay (Payables)</h5>
+                                <h5 class="mb-0 fw-bold text-dark">To Pay (Payables)</h5>
                             </div>
-                            <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-outline-secondary btn-sm">Purchase Register <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                            <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">Purchase Register <i class="fa-solid fa-arrow-right ms-1"></i></a>
                         </div>
-                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact">
+                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact border rounded-2">
                             <table class="table table-hover align-middle mb-0 inventory-table">
                                 <thead>
                                     <tr>
@@ -215,15 +233,15 @@
                     </div>
                 </div>
                 <div class="col-xl-6">
-                    <div class="card-box h-100">
+                    <div class="card-box bg-white p-3 inventory-card-standard h-100">
                         <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="inventory-section-icon text-success"><i class="fas fa-arrow-down-wide-short"></i></span>
-                                <h5 class="mb-0">Receivables</h5>
+                                <h5 class="mb-0 fw-bold text-dark">Receivables</h5>
                             </div>
-                            <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-outline-secondary btn-sm">Sales Register <i class="fa-solid fa-arrow-right ms-1"></i></a>
+                            <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">Sales Register <i class="fa-solid fa-arrow-right ms-1"></i></a>
                         </div>
-                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact">
+                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact border rounded-2">
                             <table class="table table-hover align-middle mb-0 inventory-table">
                                 <thead>
                                     <tr>
@@ -307,74 +325,6 @@
                 </div>
             </div>
 
-            <div class="card-box mb-4">
-                <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3 pb-2 border-bottom">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="inventory-section-icon text-primary"><i class="fas fa-cubes"></i></span>
-                        <div>
-                            <h5 class="mb-0">Inventory Operations &amp; Registers</h5>
-                            <p class="mb-0 small text-muted">Direct shortcuts to masters, registers, returns, and ledger statements.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_product_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-boxes-stacked me-2 text-primary"></i>Product Master &amp; Ledgers</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Catalog, stock levels, cost/selling pricing, and item ledgers.</p>
-                        </a>
-                    </div>
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_party_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-users me-2 text-info"></i>Party Master &amp; Statements</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Suppliers, customers, GST numbers, and ledger statements.</p>
-                        </a>
-                    </div>
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_purchase_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-cart-arrow-down me-2 text-primary"></i>Purchase Register</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Supplier bills, inwards, vendor credits, and payments.</p>
-                        </a>
-                    </div>
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_sales_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-cart-shopping me-2 text-success"></i>Sales Register</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Direct retail sales, repair job billing, and receivables.</p>
-                        </a>
-                    </div>
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_purchase_return_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-rotate-left me-2 text-warning"></i>Purchase Returns (Debit Notes)</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Return stock to suppliers and manage debit note vouchers.</p>
-                        </a>
-                    </div>
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{% url 'inventory_sales_return_dashboard' %}" class="card-box d-block text-decoration-none h-100 inventory-action-card p-3">
-                            <div class="d-flex align-items-center justify-content-between mb-1">
-                                <h6 class="mb-0 fw-semibold text-dark"><i class="fas fa-rotate-right me-2 text-danger"></i>Sales Returns (Credit Notes)</h6>
-                                <i class="fas fa-arrow-right text-muted small"></i>
-                            </div>
-                            <p class="mb-0 text-muted small">Handle customer returns, restock items, and issue credit notes.</p>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
             <div class="row g-4">
                 <div class="col-xl-4">
                     <div class="card-box inventory-watch-card h-100">
@@ -416,15 +366,15 @@
                 </div>
 
                 <div class="col-xl-8">
-                    <div class="card-box h-100">
+                    <div class="card-box bg-white p-3 inventory-card-standard h-100">
                         <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                            <h5 class="mb-0"><i class="fas fa-clock-rotate-left me-2"></i>Recent Inventory Entries</h5>
-                            <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                            <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-clock-rotate-left me-2 text-primary"></i>Recent Inventory Entries</h5>
+                            <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">
                                 <i class="fas fa-list me-1"></i>Open Registers
                             </a>
                         </div>
-                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact">
-                            <table class="table table-striped table-hover">
+                        <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact border rounded-2">
+                            <table class="table table-hover align-middle mb-0">
                                 <thead>
                                     <tr>
                                         <th>Date</th>
@@ -452,7 +402,7 @@
                                         <td>{{ entry.party.name }}</td>
                                         <td>{{ entry.product.name }}</td>
                                         <td>{{ entry.quantity }}</td>
-                                        <td>&#8377;{{ entry.total_amount|floatformat:2 }}</td>
+                                        <td class="font-monospace fw-semibold text-primary">&#8377;{{ entry.total_amount|floatformat:2 }}</td>
                                         <td>
                                             <span class="text-muted">{{ entry.stock_before }}</span>
                                             <i class="fas fa-arrow-right mx-1 small text-muted"></i>
@@ -461,7 +411,7 @@
                                     </tr>
                                     {% empty %}
                                     <tr>
-                                        <td colspan="9" class="text-center">No inventory entries yet.</td>
+                                        <td colspan="9" class="text-center py-4 text-muted">No inventory entries yet.</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -471,13 +421,13 @@
                 </div>
             </div>
 
-            <div class="card-box mb-4">
+            <div class="card-box bg-white p-3 inventory-card-standard mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h5 class="mb-0"><i class="fas fa-receipt me-2"></i>Recent Credit Payments</h5>
+                    <h5 class="mb-0 fw-bold text-dark"><i class="fas fa-receipt me-2 text-primary"></i>Recent Credit Payments</h5>
                     <span class="badge bg-light text-dark border">{{ credit_summary.recent_payments|length }}</span>
                 </div>
-                <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact">
-                    <table class="table table-sm table-striped mb-0">
+                <div class="table-responsive inventory-scroll-region inventory-scroll-region--compact border rounded-2">
+                    <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -497,11 +447,11 @@
                                 <td>{{ payment.party.name }}</td>
                                 <td>{{ payment.bill.invoice_number|default:payment.bill.bill_number }}</td>
                                 <td>{{ payment.get_payment_method_display }}</td>
-                                <td>&#8377;{{ payment.amount|floatformat:2 }}</td>
-                                <td>&#8377;{{ payment.balance_after|floatformat:2 }}</td>
+                                <td class="font-monospace text-success fw-semibold">&#8377;{{ payment.amount|floatformat:2 }}</td>
+                                <td class="font-monospace">&#8377;{{ payment.balance_after|floatformat:2 }}</td>
                             </tr>
                             {% empty %}
-                            <tr><td colspan="7" class="text-center text-muted">No credit payments recorded yet.</td></tr>
+                            <tr><td colspan="7" class="text-center text-muted py-4">No credit payments recorded yet.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -573,6 +523,8 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script type="application/json" id="initialCashFlowData">{{ initial_cash_flow_json|safe }}</script>
 <script>
 (function () {
 function initInventoryDashboard() {
@@ -608,5 +560,258 @@ if (document.readyState === 'loading') {
     initInventoryDashboard();
 }
 }());
+
+(function () {
+    let cashFlowChartInstance = null;
+
+    function formatCurrency(val) {
+        const num = Number(val) || 0;
+        return '₹' + num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function formatCompactCurrency(val) {
+        const num = Number(val) || 0;
+        if (Math.abs(num) >= 10000000) return '₹' + (num / 10000000).toFixed(1) + 'Cr';
+        if (Math.abs(num) >= 100000) return '₹' + (num / 100000).toFixed(1) + 'L';
+        if (Math.abs(num) >= 1000) return '₹' + (num / 1000).toFixed(1) + 'k';
+        return '₹' + num.toFixed(0);
+    }
+
+    function updateSummaryMetrics(data) {
+        const salesEl = document.getElementById('cashFlowTotalInflow');
+        const purchasesEl = document.getElementById('cashFlowTotalOutflow');
+        const salesCountEl = document.getElementById('chartSalesCount');
+        const purchasesCountEl = document.getElementById('chartPurchasesCount');
+        const rangeBadge = document.getElementById('cashFlowActiveRangeLabel');
+
+        const totalSales = data.total_sales !== undefined ? data.total_sales : (data.total_inflow || 0);
+        const totalPurchases = data.total_purchases !== undefined ? data.total_purchases : (data.total_outflow || 0);
+
+        if (salesEl) salesEl.textContent = formatCurrency(totalSales);
+        if (purchasesEl) purchasesEl.textContent = formatCurrency(totalPurchases);
+
+        if (salesCountEl) {
+            const count = data.total_sales_qty || 0;
+            salesCountEl.textContent = count + (count === 1 ? ' unit sold' : ' units sold');
+        }
+        if (purchasesCountEl) {
+            const count = data.total_purchases_qty || 0;
+            purchasesCountEl.textContent = count + (count === 1 ? ' unit received' : ' units received');
+        }
+
+        if (rangeBadge && data.range_label) {
+            rangeBadge.textContent = data.range_label;
+        }
+    }
+
+    function renderCashFlowChart(data) {
+        const canvas = document.getElementById('inventoryCashFlowCanvas');
+        if (!canvas || typeof Chart === 'undefined') return;
+
+        const ctx = canvas.getContext('2d');
+        const height = canvas.clientHeight || 300;
+
+        const salesGrad = ctx.createLinearGradient(0, 0, 0, height);
+        salesGrad.addColorStop(0, 'rgba(16, 185, 129, 0.28)');
+        salesGrad.addColorStop(1, 'rgba(16, 185, 129, 0.01)');
+
+        const purchasesGrad = ctx.createLinearGradient(0, 0, 0, height);
+        purchasesGrad.addColorStop(0, 'rgba(99, 102, 241, 0.25)');
+        purchasesGrad.addColorStop(1, 'rgba(99, 102, 241, 0.01)');
+
+        const datasets = [
+            {
+                label: 'Sales',
+                data: data.sales || data.inflow,
+                borderColor: '#10b981',
+                backgroundColor: salesGrad,
+                borderWidth: 2.4,
+                fill: true,
+                tension: 0.38,
+                pointRadius: 3,
+                pointHoverRadius: 6.5,
+                pointBackgroundColor: '#10b981',
+                pointHoverBackgroundColor: '#ffffff',
+                pointHoverBorderColor: '#10b981',
+                pointHoverBorderWidth: 2.5,
+                order: 1,
+            },
+            {
+                label: 'Purchases',
+                data: data.purchases || data.outflow,
+                borderColor: '#6366f1',
+                backgroundColor: purchasesGrad,
+                borderWidth: 2.4,
+                fill: true,
+                tension: 0.38,
+                pointRadius: 3,
+                pointHoverRadius: 6.5,
+                pointBackgroundColor: '#6366f1',
+                pointHoverBackgroundColor: '#ffffff',
+                pointHoverBorderColor: '#6366f1',
+                pointHoverBorderWidth: 2.5,
+                order: 2,
+            }
+        ];
+
+        if (cashFlowChartInstance) {
+            cashFlowChartInstance.data.labels = data.labels;
+            cashFlowChartInstance.data.datasets = datasets;
+            cashFlowChartInstance.update();
+            updateSummaryMetrics(data);
+            return;
+        }
+
+        cashFlowChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels,
+                datasets: datasets,
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: {
+                    duration: 750,
+                    easing: 'easeOutQuart',
+                },
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            usePointStyle: true,
+                            pointStyle: 'circle',
+                            boxWidth: 8,
+                            padding: 16,
+                            font: {
+                                size: 12,
+                                family: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+                                weight: 500,
+                            },
+                        },
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.92)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#cbd5e1',
+                        borderColor: 'rgba(255, 255, 255, 0.1)',
+                        borderWidth: 1,
+                        padding: 12,
+                        cornerRadius: 8,
+                        boxPadding: 4,
+                        usePointStyle: true,
+                        callbacks: {
+                            label: function (context) {
+                                const val = context.parsed.y;
+                                return ' ' + context.dataset.label + ': ' + formatCurrency(val);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false,
+                        },
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#64748b',
+                            maxTicksLimit: 16,
+                        }
+                    },
+                    y: {
+                        min: 0,
+                        grid: {
+                            color: 'rgba(226, 232, 240, 0.7)',
+                            drawBorder: false,
+                        },
+                        ticks: {
+                            font: { size: 11 },
+                            color: '#64748b',
+                            callback: function (val) {
+                                return formatCompactCurrency(val);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        updateSummaryMetrics(data);
+    }
+
+    async function fetchCashFlowData(range, start, end) {
+        const loading = document.getElementById('cashFlowChartLoading');
+        if (loading) loading.classList.remove('d-none');
+        try {
+            let url = '{% url "inventory_cash_flow_chart_api" %}?range=' + encodeURIComponent(range);
+            if (range === 'custom' && start && end) {
+                url += '&start_date=' + encodeURIComponent(start) + '&end_date=' + encodeURIComponent(end);
+            }
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('Network error');
+            const data = await res.json();
+            renderCashFlowChart(data);
+        } catch (err) {
+            console.error('Failed to load cash flow data:', err);
+        } finally {
+            if (loading) loading.classList.add('d-none');
+        }
+    }
+
+    function initCashFlowChart() {
+        const rawJsonEl = document.getElementById('initialCashFlowData');
+        if (rawJsonEl && rawJsonEl.textContent) {
+            try {
+                const initialData = JSON.parse(rawJsonEl.textContent);
+                renderCashFlowChart(initialData);
+            } catch (e) {
+                console.error('Error parsing initial cash flow JSON:', e);
+            }
+        }
+
+        const rangeSelect = document.getElementById('cashFlowRangeSelect');
+        const customWrap = document.getElementById('cashFlowCustomDateWrap');
+        const startInput = document.getElementById('cashFlowCustomStart');
+        const endInput = document.getElementById('cashFlowCustomEnd');
+        const applyBtn = document.getElementById('cashFlowCustomApplyBtn');
+
+        if (rangeSelect) {
+            rangeSelect.addEventListener('change', function () {
+                const val = this.value;
+                if (val === 'custom') {
+                    if (customWrap) customWrap.classList.remove('d-none');
+                } else {
+                    if (customWrap) customWrap.classList.add('d-none');
+                    fetchCashFlowData(val);
+                }
+            });
+        }
+
+        if (applyBtn && startInput && endInput) {
+            applyBtn.addEventListener('click', function () {
+                const s = startInput.value;
+                const e = endInput.value;
+                if (!s || !e) {
+                    alert('Please select both start and end dates.');
+                    return;
+                }
+                fetchCashFlowData('custom', s, e);
+            });
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCashFlowChart);
+    } else {
+        initCashFlowChart();
+    }
+})();
 </script>
 {% endblock %}

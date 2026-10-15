@@ -13,19 +13,19 @@
             {% include "job_tickets/_inventory_sidebar.html" %}
         </div>
         <div class="col-lg-9 col-xl-9 inventory-shell-main-col">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                 <div>
-                    <h1 class="section-title mb-1"><i class="fas fa-boxes-stacked me-2"></i>Product Ledger</h1>
+                    <h1 class="section-title mb-1"><i class="fas fa-boxes-stacked me-2 text-primary"></i>Product Ledger</h1>
                     <p class="mb-0 text-muted">{{ product.name }}{% if product.category %} | {{ product.category }}{% endif %}</p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'inventory_product_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{% url 'inventory_product_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">
                         <i class="fas fa-arrow-left me-1"></i>Products
                     </a>
-                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm">
+                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-cart-arrow-down me-1"></i>Purchase
                     </a>
-                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-secondary btn-sm">
+                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-secondary btn-sm shadow-sm">
                         <i class="fas fa-cart-shopping me-1"></i>Sale
                     </a>
                 </div>
@@ -42,14 +42,14 @@
                 <div class="col-md-6 col-xl-3">
                     <div class="card-box inventory-kpi h-100">
                         <p class="inventory-kpi-label mb-1">Stock Value</p>
-                        <h4 class="inventory-kpi-value mb-0">&#8377;{{ current_stock_value|floatformat:2 }}</h4>
+                        <h4 class="inventory-kpi-value mb-0 text-primary">&#8377;{{ current_stock_value|floatformat:2 }}</h4>
                         <div class="small text-muted">Cost: &#8377;{{ product.cost_price|floatformat:2 }}</div>
                     </div>
                 </div>
                 <div class="col-md-6 col-xl-3">
                     <div class="card-box inventory-kpi h-100">
                         <p class="inventory-kpi-label mb-1">Qty In / Out</p>
-                        <h4 class="inventory-kpi-value mb-0">{{ total_in_qty }} / {{ total_out_qty }}</h4>
+                        <h4 class="inventory-kpi-value mb-0"><span class="text-success">{{ total_in_qty }}</span> / <span class="text-danger">{{ total_out_qty }}</span></h4>
                         <div class="small text-muted">Filtered movement</div>
                     </div>
                 </div>
@@ -62,10 +62,10 @@
                 </div>
             </div>
 
-            <div class="card-box">
+            <div class="card-box bg-white p-3 inventory-card-standard">
                 <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                     <div>
-                        <h5 class="mb-1"><i class="fas fa-list me-2"></i>Stock Movement</h5>
+                        <h5 class="mb-1 fw-bold text-dark"><i class="fas fa-list me-2 text-primary"></i>Stock Movement</h5>
                         <p class="mb-0 small text-muted">Full purchase, sale, and return movement for this product.</p>
                     </div>
                     <form method="get" class="row g-2 align-items-center">
@@ -88,8 +88,8 @@
                     </form>
                 </div>
 
-                <div class="table-responsive inventory-scroll-region">
-                    <table class="table table-striped table-hover align-middle">
+                <div class="table-responsive inventory-scroll-region border rounded-2">
+                    <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -112,7 +112,13 @@
                                 <td><span class="inv-entry-type inv-entry-type--{{ row.entry_type }}">{{ row.entry_type_label }}</span></td>
                                 <td>{{ row.invoice_number }}</td>
                                 <td>
-                                    <a href="{% url 'inventory_party_ledger' party_id=row.party.id %}">{{ row.party.name }}</a>
+                                    {% if row.party and row.party.id %}
+                                        <a href="{% url 'inventory_party_ledger' party_id=row.party.id %}">{{ row.party.name }}</a>
+                                    {% elif row.party and row.party.name %}
+                                        {{ row.party.name }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if row.job_ticket %}
@@ -121,19 +127,32 @@
                                         -
                                     {% endif %}
                                 </td>
-                                <td class="text-end text-success fw-semibold">{{ row.qty_in|default:"-" }}</td>
-                                <td class="text-end text-danger fw-semibold">{{ row.qty_out|default:"-" }}</td>
-                                <td class="text-end fw-semibold">{{ row.stock_balance }}</td>
-                                <td class="text-end">&#8377;{{ row.unit_price|floatformat:2 }}</td>
-                                <td class="text-end">&#8377;{{ row.total_amount|floatformat:2 }}</td>
+                                <td class="text-end text-success fw-semibold font-monospace">{{ row.qty_in|default:"-" }}</td>
+                                <td class="text-end text-danger fw-semibold font-monospace">{{ row.qty_out|default:"-" }}</td>
+                                <td class="text-end fw-semibold font-monospace">{{ row.stock_balance }}</td>
+                                <td class="text-end font-monospace">&#8377;{{ row.unit_price|floatformat:2 }}</td>
+                                <td class="text-end font-monospace fw-semibold text-primary">&#8377;{{ row.total_amount|floatformat:2 }}</td>
                                 <td>{{ row.created_by.username|default:"-" }}</td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="11" class="text-center text-muted">No product movement found.</td>
+                                <td colspan="11" class="text-center text-muted py-4">No product movement found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light border-top">
+                            <tr class="fw-bold">
+                                <td colspan="5" class="text-muted small text-uppercase py-2.5 ps-3">
+                                    Total Movement ({{ ledger_rows|length }} entries)
+                                </td>
+                                <td class="text-end py-2.5 font-monospace text-success">+{{ total_in_qty }}</td>
+                                <td class="text-end py-2.5 font-monospace text-danger">-{{ total_out_qty }}</td>
+                                <td class="text-end py-2.5 font-monospace text-dark">{% if ledger_rows %}{{ ledger_rows.0.stock_balance }}{% else %}{{ product.stock_quantity }}{% endif %}</td>
+                                <td></td>
+                                <td class="text-end py-2.5 font-monospace text-primary">&#8377;{{ total_movement_amount|floatformat:2 }}</td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>

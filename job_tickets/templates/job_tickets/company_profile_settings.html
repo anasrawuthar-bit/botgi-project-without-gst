@@ -31,7 +31,7 @@
                                     <i class="fa-solid fa-address-card me-1"></i>Contact
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary rounded-pill px-3 settings-mobile-pill" type="button" data-settings-tab="#legal-tax">
-                                    <i class="fa-solid fa-file-invoice me-1"></i>Legal & Tax
+                                    <i class="fa-solid fa-scale-balanced me-1"></i>Legal
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary rounded-pill px-3 settings-mobile-pill" type="button" data-settings-tab="#bank-details">
                                     <i class="fa-solid fa-building-columns me-1"></i>Bank
@@ -41,9 +41,6 @@
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary rounded-pill px-3 settings-mobile-pill" type="button" data-settings-tab="#bill-settings">
                                     <i class="fa-solid fa-receipt me-1"></i>Bill / Invoice
-                                </button>
-                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3 settings-mobile-pill" type="button" data-settings-tab="#billing-settings">
-                                    <i class="fa-solid fa-indian-rupee-sign me-1"></i>Tax & GST
                                 </button>
                                 <button class="btn btn-sm btn-outline-primary rounded-pill px-3 settings-mobile-pill" type="button" data-settings-tab="#terms-policies">
                                     <i class="fa-solid fa-file-contract me-1"></i>Policies
@@ -157,72 +154,34 @@
                                     </div>
 
                                     <div class="tab-pane fade" id="legal-tax" role="tabpanel" aria-labelledby="tab-legal-tax" tabindex="0">
-                                        <div class="alert alert-info">
-                                            <i class="fas fa-info-circle"></i> These details will appear on invoices and receipts
+                                        <div class="alert alert-info py-2">
+                                            <i class="fas fa-info-circle me-1"></i> Registered business identity and PAN details.
                                         </div>
                                         <div class="row">
                                             <div class="col-md-6 mb-3">
-                                                <label class="form-label">Legal Name</label>
+                                                <label class="form-label fw-semibold">Legal / Registered Name</label>
                                                 {{ form.legal_name }}
                                                 {% if form.legal_name.errors %}
                                                     <div class="text-danger small mt-1">{{ form.legal_name.errors|striptags }}</div>
                                                 {% endif %}
-                                                <small class="form-text text-muted">Registered business name for GST documents.</small>
+                                                <small class="form-text text-muted">Official registered name of the business.</small>
                                             </div>
                                             <div class="col-md-6 mb-3">
-                                                <label class="form-label">GSTIN (GST Number)</label>
-                                                {{ form.gstin }}
-                                                {% if form.gstin.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.gstin.errors|striptags }}</div>
-                                                {% endif %}
-                                                <small class="form-text text-muted">15-digit GST Identification Number</small>
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">PAN</label>
+                                                <label class="form-label fw-semibold">PAN (Permanent Account Number)</label>
                                                 {{ form.pan }}
                                                 {% if form.pan.errors %}
                                                     <div class="text-danger small mt-1">{{ form.pan.errors|striptags }}</div>
                                                 {% endif %}
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">State Code</label>
-                                                {{ form.state_code }}
-                                                {% if form.state_code.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.state_code.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">Registration Type</label>
-                                                {{ form.registration_type }}
-                                                {% if form.registration_type.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.registration_type.errors|striptags }}</div>
-                                                {% endif %}
+                                                <small class="form-text text-muted">10-character business PAN.</small>
                                             </div>
                                         </div>
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">Filing Frequency</label>
-                                                {{ form.filing_frequency }}
-                                                {% if form.filing_frequency.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.filing_frequency.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">Turnover Band</label>
-                                                {{ form.annual_turnover_band }}
-                                                {% if form.annual_turnover_band.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.annual_turnover_band.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label class="form-label">Default POS State</label>
-                                                {{ form.default_place_of_supply_state }}
-                                                {% if form.default_place_of_supply_state.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.default_place_of_supply_state.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
+                                        <div class="d-none">
+                                            {{ form.gstin }}
+                                            {{ form.state_code }}
+                                            {{ form.registration_type }}
+                                            {{ form.filing_frequency }}
+                                            {{ form.annual_turnover_band }}
+                                            {{ form.default_place_of_supply_state }}
                                         </div>
                                     </div>
 
@@ -879,72 +838,12 @@
                                         </div>
                                     </div>
 
-                                    <div class="tab-pane fade" id="billing-settings" role="tabpanel" aria-labelledby="tab-billing-settings" tabindex="0">
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <div class="form-check form-switch">
-                                                    {{ form.enable_gst }}
-                                                    <label class="form-check-label" for="{{ form.enable_gst.id_for_label }}">
-                                                        Enable GST on Invoices
-                                                    </label>
-                                                </div>
-                                                <small class="form-text text-muted">
-                                                    When enabled, GST will be calculated and shown on job receipts and invoices
-                                                </small>
-                                            </div>
-                                            <div class="col-md-6 mb-3">
-                                                <div class="form-check form-switch">
-                                                    {{ form.qrmp_enabled }}
-                                                    <label class="form-check-label" for="{{ form.qrmp_enabled.id_for_label }}">
-                                                        {{ form.qrmp_enabled.label }}
-                                                    </label>
-                                                </div>
-                                                {% if form.qrmp_enabled.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.qrmp_enabled.errors|striptags }}</div>
-                                                {% endif %}
-                                                <small class="form-text text-muted">Use quarterly GST return filing where applicable.</small>
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <label class="form-label">GST Rate (%)</label>
-                                                {{ form.gst_rate }}
-                                                {% if form.gst_rate.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.gst_rate.errors|striptags }}</div>
-                                                {% endif %}
-                                                <small class="form-text text-muted">Standard GST rate in India is 18%</small>
-                                            </div>
-                                            <div class="col-md-6 mb-3">
-                                                <div class="form-check mt-4">
-                                                    {{ form.lut_bond_enabled }}
-                                                    <label class="form-check-label" for="{{ form.lut_bond_enabled.id_for_label }}">
-                                                        {{ form.lut_bond_enabled.label }}
-                                                    </label>
-                                                </div>
-                                                {% if form.lut_bond_enabled.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.lut_bond_enabled.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3">
-                                                <div class="form-check form-switch">
-                                                    {{ form.e_invoice_applicable }}
-                                                    <label class="form-check-label" for="{{ form.e_invoice_applicable.id_for_label }}">
-                                                        {{ form.e_invoice_applicable.label }}
-                                                    </label>
-                                                </div>
-                                                {% if form.e_invoice_applicable.errors %}
-                                                    <div class="text-danger small mt-1">{{ form.e_invoice_applicable.errors|striptags }}</div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="alert alert-secondary">
-                                            <i class="fas fa-file-invoice"></i> Service billing and inventory sales now share the same invoice sequence.
-                                        </div>
-                                        <div class="alert alert-info mt-3">
-                                            <i class="fas fa-info-circle"></i> GST will be calculated on the total amount (parts + service charges) when enabled
-                                        </div>
+                                    <div class="d-none">
+                                        <input type="checkbox" name="enable_gst" id="id_enable_gst">
+                                        <input type="number" name="gst_rate" id="id_gst_rate" value="0.00">
+                                        <input type="checkbox" name="qrmp_enabled" id="id_qrmp_enabled">
+                                        <input type="checkbox" name="lut_bond_enabled" id="id_lut_bond_enabled">
+                                        <input type="checkbox" name="e_invoice_applicable" id="id_e_invoice_applicable">
                                     </div>
 
                                     <div class="tab-pane fade" id="terms-policies" role="tabpanel" aria-labelledby="tab-terms-policies" tabindex="0">
@@ -3399,8 +3298,8 @@ document.addEventListener('DOMContentLoaded', function () {
             subtitle: 'Workshop address, communication email, and client support phone numbers.'
         },
         '#legal-tax': {
-            title: 'Legal & Tax Identifiers',
-            subtitle: 'GSTIN, PAN number, registered legal entity name, and tax configuration.'
+            title: 'Legal & Business Identifiers',
+            subtitle: 'Registered business legal entity name and PAN identification.'
         },
         '#bank-details': {
             title: 'Banking & Payment Receiving',
@@ -3413,10 +3312,6 @@ document.addEventListener('DOMContentLoaded', function () {
         '#bill-settings': {
             title: 'Bill & Invoice Configuration',
             subtitle: 'Paper format, technician display format, and billing preferences.'
-        },
-        '#billing-settings': {
-            title: 'Tax & GST System Defaults',
-            subtitle: 'GST enablement, standard tax rate, QRMP, and e-invoicing compliance options.'
         },
         '#terms-policies': {
             title: 'Terms, Conditions & Repair Policies',

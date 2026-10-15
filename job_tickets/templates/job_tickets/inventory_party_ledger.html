@@ -13,23 +13,27 @@
             {% include "job_tickets/_inventory_sidebar.html" %}
         </div>
         <div class="col-lg-9 col-xl-9 inventory-shell-main-col">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                 <div>
-                    <h1 class="section-title mb-1"><i class="fas fa-users me-2"></i>Party Ledger</h1>
+                    <h1 class="section-title mb-1"><i class="fas fa-users me-2 text-primary"></i>Party Ledger</h1>
                     <p class="mb-0 text-muted">
                         {{ party.name }}
                         {% if party.phone %} | <a href="tel:{{ party.phone }}">{{ party.phone }}</a>{% endif %}
-                        {% if party.gstin %} | GSTIN: {{ party.gstin }}{% endif %}
+                        {% if party.opening_balance %}
+                            | <span class="badge {% if party.opening_balance < 0 %}bg-danger-subtle text-danger border{% else %}bg-success-subtle text-success border{% endif %}">
+                                Opening Balance: &#8377;{{ party.opening_balance|floatformat:2|cut:"-" }} ({% if party.opening_balance < 0 %}To Pay{% else %}To Receive{% endif %})
+                            </span>
+                        {% endif %}
                     </p>
                 </div>
                 <div class="d-flex flex-wrap gap-2">
-                    <a href="{% url 'inventory_party_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <a href="{% url 'inventory_party_dashboard' %}" class="btn btn-outline-secondary btn-sm shadow-sm">
                         <i class="fas fa-arrow-left me-1"></i>Parties
                     </a>
-                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm">
+                    <a href="{% url 'inventory_purchase_dashboard' %}" class="btn btn-primary btn-sm shadow-sm">
                         <i class="fas fa-cart-arrow-down me-1"></i>Purchase
                     </a>
-                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-secondary btn-sm">
+                    <a href="{% url 'inventory_sales_dashboard' %}" class="btn btn-secondary btn-sm shadow-sm">
                         <i class="fas fa-cart-shopping me-1"></i>Sale
                     </a>
                 </div>
@@ -66,10 +70,10 @@
                 </div>
             </div>
 
-            <div class="card-box mb-4">
+            <div class="card-box bg-white p-3 mb-4 inventory-card-standard">
                 <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap mb-3">
                     <div>
-                        <h5 class="mb-1"><i class="fas fa-file-invoice me-2"></i>Bills</h5>
+                        <h5 class="mb-1 fw-bold text-dark"><i class="fas fa-file-invoice me-2 text-primary"></i>Bills</h5>
                         <p class="mb-0 small text-muted">Purchase, sales, and return bills for this party.</p>
                     </div>
                     <form method="get" class="row g-2 align-items-center">
@@ -92,8 +96,8 @@
                     </form>
                 </div>
 
-                <div class="table-responsive inventory-scroll-region">
-                    <table class="table table-striped table-hover align-middle">
+                <div class="table-responsive inventory-scroll-region border rounded-2">
+                    <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -114,16 +118,16 @@
                                 <td><span class="inv-entry-type inv-entry-type--{{ bill.entry_type }}">{{ bill.entry_type_label }}</span></td>
                                 <td>{{ bill.invoice_display }}</td>
                                 <td>{{ bill.item_label }}</td>
-                                <td class="text-end">{{ bill.total_quantity }}</td>
-                                <td class="text-end">&#8377;{{ bill.total_amount|floatformat:2 }}</td>
-                                <td class="text-end">
+                                <td class="text-end font-monospace">{{ bill.total_quantity }}</td>
+                                <td class="text-end font-monospace text-primary fw-semibold">&#8377;{{ bill.total_amount|floatformat:2 }}</td>
+                                <td class="text-end font-monospace">
                                     {% if bill.credit_direction %}
                                         &#8377;{{ bill.credit_paid_amount|floatformat:2 }}
                                     {% else %}
                                         -
                                     {% endif %}
                                 </td>
-                                <td class="text-end">
+                                <td class="text-end font-monospace">
                                     {% if bill.credit_direction %}
                                         <strong class="{% if bill.credit_balance_amount > 0 %}text-warning{% else %}text-success{% endif %}">
                                             &#8377;{{ bill.credit_balance_amount|floatformat:2 }}
@@ -136,24 +140,38 @@
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="9" class="text-center text-muted">No bills found.</td>
+                                <td colspan="9" class="text-center text-muted py-4">No bills found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light border-top">
+                            <tr class="fw-bold">
+                                <td colspan="4" class="text-muted small text-uppercase py-2.5 ps-3">Total Summary ({{ bill_rows|length }} bills)</td>
+                                <td class="text-end py-2.5 font-monospace"></td>
+                                <td class="text-end py-2.5 font-monospace text-primary">&#8377;{{ purchase_total|add:sales_total|floatformat:2 }}</td>
+                                <td class="text-end py-2.5 font-monospace text-muted">&#8377;{{ paid_total|add:received_total|floatformat:2 }}</td>
+                                <td class="text-end py-2.5 font-monospace">
+                                    <span class="{% if payable_balance > 0 %}text-warning{% elif receivable_balance > 0 %}text-success{% else %}text-muted{% endif %}">
+                                        {% if payable_balance > 0 %}&#8377;{{ payable_balance|floatformat:2 }}{% elif receivable_balance > 0 %}&#8377;{{ receivable_balance|floatformat:2 }}{% else %}&#8377;0.00{% endif %}
+                                    </span>
+                                </td>
+                                <td></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
 
-            <div class="card-box">
+            <div class="card-box bg-white p-3 inventory-card-standard">
                 <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
                     <div>
-                        <h5 class="mb-1"><i class="fas fa-money-bill-transfer me-2"></i>Payment History</h5>
+                        <h5 class="mb-1 fw-bold text-dark"><i class="fas fa-money-bill-transfer me-2 text-primary"></i>Payment History</h5>
                         <p class="mb-0 small text-muted">Cash and transfer settlements recorded against this party.</p>
                     </div>
                     <span class="badge rounded-pill text-bg-secondary">{{ payments|length }}</span>
                 </div>
-                <div class="table-responsive inventory-scroll-region">
-                    <table class="table table-striped table-hover align-middle">
+                <div class="table-responsive inventory-scroll-region border rounded-2">
+                    <table class="table table-hover align-middle mb-0">
                         <thead>
                             <tr>
                                 <th>Date</th>
@@ -174,16 +192,23 @@
                                 <td>{{ payment.bill.invoice_number|default:payment.bill.bill_number }}</td>
                                 <td>{{ payment.get_payment_method_display }}</td>
                                 <td>{{ payment.reference_no|default:"-" }}</td>
-                                <td class="text-end">&#8377;{{ payment.amount|floatformat:2 }}</td>
-                                <td class="text-end">&#8377;{{ payment.balance_after|floatformat:2 }}</td>
+                                <td class="text-end font-monospace text-success fw-semibold">&#8377;{{ payment.amount|floatformat:2 }}</td>
+                                <td class="text-end font-monospace">&#8377;{{ payment.balance_after|floatformat:2 }}</td>
                                 <td>{{ payment.created_by.username|default:"-" }}</td>
                             </tr>
                             {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center text-muted">No payments found.</td>
+                                <td colspan="8" class="text-center text-muted py-4">No payments found.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
+                        <tfoot class="table-light border-top">
+                            <tr class="fw-bold">
+                                <td colspan="5" class="text-muted small text-uppercase py-2.5 ps-3">Total Payments Recorded ({{ payments|length }})</td>
+                                <td class="text-end py-2.5 font-monospace text-success">&#8377;{{ paid_total|add:received_total|floatformat:2 }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
                     </table>
                 </div>
             </div>
