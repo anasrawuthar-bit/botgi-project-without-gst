@@ -20,20 +20,20 @@
                 <tr id="service-log-{{ log.id }}">
                     <td class="text-muted small fw-bold text-center">{{ forloop.counter }}</td>
                     <td>
-                        <input type="text" name="description_{{ log.id }}" value="{{ log.description }}" class="form-control form-control-sm" placeholder="Service description">
+                        <input type="text" name="description_{{ log.id }}" value="{{ log.description }}" class="form-control form-control-sm" placeholder="Service description" {% if job.status in 'Ready for Pickup,Completed,Closed' or job.vyapar_invoice_number %}disabled{% endif %}>
                         <div class="invalid-feedback" data-field="description_{{ log.id }}"></div>
                     </td>
                     <td>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text py-0 px-1 text-muted" style="font-size: 11px;">&#8377;</span>
-                            <input type="number" step="0.01" min="0" name="part_cost_{{ log.id }}" value="{{ log.part_cost|default_if_none:'0.00' }}" class="form-control form-control-sm text-end part-cost-input" placeholder="0.00" data-log-id="{{ log.id }}">
+                            <input type="number" step="0.01" min="0" name="part_cost_{{ log.id }}" value="{{ log.part_cost|default_if_none:'0.00' }}" class="form-control form-control-sm text-end part-cost-input" placeholder="0.00" data-log-id="{{ log.id }}" {% if job.status in 'Ready for Pickup,Completed,Closed' or job.vyapar_invoice_number %}disabled{% endif %}>
                         </div>
                         <div class="invalid-feedback" data-field="part_cost_{{ log.id }}"></div>
                     </td>
                     <td>
                         <div class="input-group input-group-sm">
                             <span class="input-group-text py-0 px-1 text-muted" style="font-size: 11px;">&#8377;</span>
-                            <input type="number" step="0.01" min="0" name="service_charge_{{ log.id }}" value="{{ log.service_charge|default_if_none:'0.00' }}" class="form-control form-control-sm text-end service-charge-input" placeholder="0.00" data-log-id="{{ log.id }}">
+                            <input type="number" step="0.01" min="0" name="service_charge_{{ log.id }}" value="{{ log.service_charge|default_if_none:'0.00' }}" class="form-control form-control-sm text-end service-charge-input" placeholder="0.00" data-log-id="{{ log.id }}" {% if job.status in 'Ready for Pickup,Completed,Closed' or job.vyapar_invoice_number %}disabled{% endif %}>
                         </div>
                         <div class="invalid-feedback" data-field="service_charge_{{ log.id }}"></div>
                     </td>
@@ -45,6 +45,8 @@
                         <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 delete-log-btn" data-log-id="{{ log.id }}" data-delete-url="{% url 'technician_delete_service_log' log.id %}" title="Delete this entry">
                             <i class="fas fa-trash-alt"></i>
                         </button>
+                        {% else %}
+                        <span class="text-muted small" title="Locked"><i class="fas fa-lock text-secondary"></i></span>
                         {% endif %}
                     </td>
                 </tr>
@@ -62,6 +64,7 @@
         </table>
     </div>
 
+    {% if not job.status in 'Ready for Pickup,Completed,Closed' and not job.vyapar_invoice_number %}
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2 pt-2 border-top">
         <div class="small text-muted">
             <i class="fas fa-info-circle me-1"></i> Edit descriptions or amounts above and click "Save Changes" to update.
@@ -72,6 +75,11 @@
             </button>
         </div>
     </div>
+    {% else %}
+    <div class="small text-muted mt-2 pt-2 border-top">
+        <i class="fas fa-lock text-secondary me-1"></i> Line item charges are locked because this job is {{ job.get_status_display|lower }}.
+    </div>
+    {% endif %}
     {% else %}
     <div class="p-4 text-center text-muted border rounded bg-light">
         <i class="fas fa-tools fa-2x mb-2 text-secondary opacity-50"></i>

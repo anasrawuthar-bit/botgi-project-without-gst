@@ -142,6 +142,18 @@
         </div>
     </div>
 
+    {% if is_closed or job.status == 'Closed' %}
+    <div class="alert alert-secondary border-secondary-subtle shadow-sm mb-3 d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-secondary text-white p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+            <i class="fas fa-lock fs-5"></i>
+        </div>
+        <div>
+            <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-shield-alt text-secondary me-1"></i> Job Closed &amp; Billed — Locked</h6>
+            <div class="small text-muted">This job ticket has been finalized, billed, and closed by staff. Status changes, additional service charges, spare parts, and rack movements are strictly locked.</div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Modern Unified Device & Customer Overview Card -->
     <div class="card mb-3 shadow-sm border-0" style="background: linear-gradient(180deg, #ffffff 0%, #f9fbfe 100%); border: 1px solid #dbe5f2 !important;">
         <div class="card-body p-3 p-md-4">
@@ -248,9 +260,11 @@
                                 No slot assigned
                             {% endif %}
                         </span>
+                        {% if not is_closed and job.status != 'Closed' %}
                         <button type="button" class="btn btn-sm btn-outline-primary py-1 px-2.5 fw-medium" data-bs-toggle="modal" data-bs-target="#techMoveRackModal">
                             <i class="fas fa-arrows-turn-to-dots me-1"></i>Move
                         </button>
+                        {% endif %}
                     </div>
 
                     <!-- Intake Photos Preview (if any) -->
@@ -299,7 +313,7 @@
                             This job is with vendor for specialized service. Status cannot be changed until it is returned.
                         </div>
                     {% endif %}
-                    {% if can_change_status %}
+                    {% if can_change_status and not is_closed and job.status != 'Closed' %}
                     <div class="d-flex flex-wrap gap-2 align-items-center mb-3 p-2 bg-light rounded border">
                         <span class="small fw-bold text-muted me-1"><i class="fas fa-bolt text-warning me-1"></i>Quick Actions:</span>
                         {% if job.status == 'Pending' %}
@@ -331,6 +345,18 @@
                     </div>
                     {% endif %}
 
+                    {% if is_closed or job.status == 'Closed' %}
+                    <div class="alert alert-light border small text-muted mb-3 d-flex align-items-center gap-2">
+                        <i class="fas fa-lock text-secondary"></i>
+                        <span>This job is <strong>Closed</strong>. Status transitions, notes, and checklist updates are locked.</span>
+                    </div>
+                    {% if job.technician_notes %}
+                    <div class="mb-3 p-2.5 bg-light rounded border">
+                        <span class="small fw-bold text-muted d-block mb-1"><i class="fas fa-clipboard-list me-1"></i>Technician Notes:</span>
+                        <div class="small text-dark" style="white-space: pre-wrap;">{{ job.technician_notes }}</div>
+                    </div>
+                    {% endif %}
+                    {% else %}
                     <form method="post" id="update-status-form">
                         {% csrf_token %}
                         <input type="hidden" name="action" value="update_status">
@@ -447,6 +473,7 @@
                             <span id="update-status-message" class="small"></span>
                         </div>
                     </form>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -524,7 +551,17 @@
                     </div>
                 </div>
                 <div class="card-body p-3">
-                    {% if job.status == 'Specialized Service' %}
+                    {% if is_closed or job.status == 'Closed' %}
+                        <div class="alert alert-light border text-muted small mb-3 d-flex align-items-center gap-2">
+                            <i class="fas fa-lock text-secondary"></i>
+                            <span>Parts and service charges cannot be added because this job is finalized and closed.</span>
+                        </div>
+                    {% elif job.status in 'Ready for Pickup,Completed' or job.vyapar_invoice_number %}
+                        <div class="alert alert-light border text-muted small mb-3 d-flex align-items-center gap-2">
+                            <i class="fas fa-lock text-secondary"></i>
+                            <span>Adding parts or labor charges is disabled after job completion/billing.</span>
+                        </div>
+                    {% elif job.status == 'Specialized Service' %}
                         <div class="alert alert-warning mb-3">
                             <i class="fas fa-exclamation-triangle me-1"></i>
                             <strong>Job with Vendor:</strong> Manual service log entry is disabled while this job is in Specialized Service. Charges will be recorded upon vendor return.
@@ -838,6 +875,11 @@
                         statusBadge.textContent = data.status_display;
                     }
                 } else {
+                    if (data.is_closed) {
+                        showMessage('update-status-message', data.message || 'Job is closed and billed. Refreshing...', 'error');
+                        setTimeout(() => window.location.reload(), 1200);
+                        return;
+                    }
                     if (Array.isArray(data.missing_checklist_fields)) {
                         const preview = data.missing_checklist_fields.slice(0, 6).join(', ');
                         const suffix = data.missing_checklist_fields.length > 6 ? '...' : '';
@@ -1077,6 +1119,14 @@
                         modalInstance.hide();
                     }
                 } else {
+                    if (data.is_closed) {
+                        if (feedback) {
+                            feedback.className = 'small mt-1 text-danger';
+                            feedback.textContent = data.message || 'Job is closed. Refreshing...';
+                        }
+                        setTimeout(() => window.location.reload(), 1200);
+                        return;
+                    }
                     if (feedback) {
                         feedback.className = 'small mt-1 text-danger';
                         feedback.textContent = data.message || 'Error updating rack location.';
@@ -1204,6 +1254,11 @@
                 submitBtn.innerHTML = originalText;
 
                 if (!data.ok) {
+                    if (data.is_closed) {
+                        showMessage('add-service-message', data.message || 'Job is closed and billed. Refreshing...', 'error');
+                        setTimeout(() => window.location.reload(), 1200);
+                        return;
+                    }
                     showMessage('add-service-message', data.message || 'Error adding service log.', 'error');
                     return;
                 }

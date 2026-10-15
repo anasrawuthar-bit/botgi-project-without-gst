@@ -193,6 +193,10 @@ def request_specialized_service(request, job_code):
         
     job = get_object_or_404(JobTicket, job_code=job_code)
     
+    if job.status in ['Closed', 'Completed', 'Ready for Pickup']:
+        messages.error(request, f"Cannot request specialized service for a job that is already {job.get_status_display().lower()}.")
+        return redirect("job_detail_technician", job_code=job.job_code)
+
     with transaction.atomic():
         # Check if a SpecializedService already exists
         if hasattr(job, 'specialized_service'):

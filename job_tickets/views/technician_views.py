@@ -206,32 +206,49 @@ def job_detail_technician(request, job_code):
         assigned_to=technician,
     )
 
-    # ----------------------------------------------------
-    # CORE CHANGE: Filter Status Choices for Technicians
-    # ----------------------------------------------------
+    is_closed = (job.status == 'Closed')
+    is_ready_for_pickup = (job.status == 'Ready for Pickup')
+
     EXCLUDED_STATUSES = ['Ready for Pickup', 'Closed', 'Specialized Service']
     
-    # Create a filtered list from the model's choices
-    technician_status_choices = [
-        (value, label) for value, label in job.STATUS_CHOICES # Access choices from the JobTicket model
-        if label not in EXCLUDED_STATUSES
-    ]
-    
-    # Additional restriction: If job is in Specialized Service, check if it's returned from vendor
-    can_change_status = True
-    if job.status == 'Specialized Service':
-        # Check if there's a specialized service record and if it's returned from vendor
-        specialized_service = getattr(job, 'specialized_service', None)
-        if specialized_service and specialized_service.status != 'Returned from Vendor':
-            can_change_status = False
+    if is_closed or is_ready_for_pickup:
+        technician_status_choices = []
+        can_change_status = False
+    else:
+        # Create a filtered list from the model's choices
+        technician_status_choices = [
+            (value, label) for value, label in job.STATUS_CHOICES # Access choices from the JobTicket model
+            if label not in EXCLUDED_STATUSES
+        ]
+        can_change_status = True
+        if job.status == 'Specialized Service':
+            # Check if there's a specialized service record and if it's returned from vendor
+            specialized_service = getattr(job, 'specialized_service', None)
+            if specialized_service and specialized_service.status != 'Returned from Vendor':
+                can_change_status = False
+
     checklist_schema, checklist_title, checklist_notes = _build_checklist_schema_for_job(job)
     checklist_required_for_completion = _checklist_requires_completion(checklist_schema)
     # ----------------------------------------------------
 
     if request.method == 'POST':
+        if is_closed:
+            error_message = "This job is closed and billed. No further changes are permitted."
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': False, 'message': error_message, 'is_closed': True}, status=400)
+            messages.error(request, error_message)
+            return redirect('job_detail_technician', job_code=job_code)
+
         action = request.POST.get('action')
 
         if action == 'update_status':
+            if is_ready_for_pickup:
+                error_message = "Cannot change status of a job that is Ready for Pickup."
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                    return JsonResponse({'ok': False, 'message': error_message, 'is_closed': False}, status=400)
+                messages.error(request, error_message)
+                return redirect('job_detail_technician', job_code=job_code)
+
             new_status = (request.POST.get('status') or '').strip()
             technician_notes = request.POST.get('technician_notes', '')
             posted_answers, missing_required_labels, invalid_option_labels = _extract_checklist_answers_from_post(
@@ -371,6 +388,14 @@ def job_detail_technician(request, job_code):
             return redirect('job_detail_technician', job_code=job_code)
 
         elif action == 'add_service_log':
+            # Prevent adding logs if job is finalized, billed, or completed
+            if job.status in ['Ready for Pickup', 'Completed', 'Closed'] or job.vyapar_invoice_number:
+                error_message = 'Cannot add service logs after completion or billing.'
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                    return JsonResponse({'ok': False, 'message': error_message, 'is_closed': is_closed}, status=400)
+                messages.error(request, error_message)
+                return redirect('job_detail_technician', job_code=job_code)
+
             # Check if job is in specialized service - prevent manual service charge entry
             if job.status == 'Specialized Service':
                 error_message = 'Cannot add service logs while job is in Specialized Service. Service charges will be automatically added when returned from vendor.'
@@ -622,6 +647,7 @@ def job_detail_technician(request, job_code):
 
     context = {
         'job': job,
+        'is_closed': is_closed,
         'service_logs': service_logs,
         'service_form': service_form,
         'total_parts_cost': job.part_total,
@@ -704,6 +730,10 @@ def job_mark_started(request, job_code):
     is_staff_actor = bool(request.user.is_staff and user_has_staff_access(request.user, "staff_dashboard"))
     if not (is_assigned_tech or is_staff_actor):
         return HttpResponseForbidden("You are not permitted to mark this job as started.")
+
+    if job.status in ['Closed', 'Completed', 'Ready for Pickup']:
+        messages.error(request, f"Permission denied: Cannot start a job that is already {job.get_status_display().lower()}.")
+        return redirect("job_detail_technician", job_code=job.job_code)
 
     # Decide the status you want when "started"
     old_status = job.get_status_display()
@@ -884,6 +914,13 @@ def technician_return_to_staff(request, job_code):
         if job.assigned_to != tech:
             messages.error(request, "You are not assigned to this job.")
             return redirect('technician_dashboard') # Or return HttpResponseForbidden
+
+        if job.status in ['Closed', 'Completed', 'Ready for Pickup']:
+            msg = f"Cannot return a {job.get_status_display().lower()} job to staff."
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'ok': False, 'message': msg, 'is_closed': (job.status == 'Closed')}, status=400)
+            messages.error(request, msg)
+            return redirect('technician_dashboard')
 
         old_status = job.get_status_display()
         job.assigned_to = None

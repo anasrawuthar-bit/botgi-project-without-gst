@@ -559,6 +559,8 @@ def mobile_api_job_detail(request, job_code):
 
 
 def _mobile_technician_status_choices(job):
+    if job.status in ['Closed', 'Ready for Pickup']:
+        return []
     excluded_statuses = {'Pending', 'Ready for Pickup', 'Closed', 'Specialized Service'}
     return [
         {'value': value, 'label': label}
@@ -568,6 +570,8 @@ def _mobile_technician_status_choices(job):
 
 
 def _mobile_technician_can_change_status(job):
+    if job.status in ['Closed', 'Ready for Pickup']:
+        return False
     if job.status == 'Specialized Service':
         specialized_service = getattr(job, 'specialized_service', None)
         if specialized_service and specialized_service.status != 'Returned from Vendor':
@@ -711,6 +715,12 @@ def mobile_api_job_technician_update(request, job_code):
             return JsonResponse(
                 {'error': 'forbidden', 'message': 'Only the assigned technician can update this job.'},
                 status=403,
+            )
+
+        if job.status in ['Closed', 'Ready for Pickup']:
+            return JsonResponse(
+                {'error': 'status_locked', 'message': f'Cannot change status for a {job.get_status_display().lower()} job.'},
+                status=400,
             )
 
         if not _mobile_technician_can_change_status(job):
@@ -934,6 +944,8 @@ def mobile_api_job_action(request, job_code):
         if action_key == 'return_to_staff':
             if not permissions['is_assigned_tech']:
                 return JsonResponse({'error': 'forbidden', 'message': 'Only the assigned technician can return this job.'}, status=403)
+            if job.status in ['Closed', 'Completed', 'Ready for Pickup']:
+                return JsonResponse({'error': 'invalid_transition', 'message': f'Cannot return a {job.get_status_display().lower()} job to staff.'}, status=400)
             if not job.is_new_assignment:
                 return JsonResponse(
                     {'error': 'invalid_transition', 'message': 'Only newly assigned jobs can be returned to staff.'},
@@ -1016,6 +1028,9 @@ def mobile_api_job_action(request, job_code):
                     'available_actions': get_mobile_job_available_actions(user, job),
                 }
             )
+
+        if job.status == 'Closed':
+            return JsonResponse({'error': 'job_closed', 'message': 'This job is closed and billed. No actions can be performed.'}, status=400)
 
         target_status = None
         log_action = 'STATUS'

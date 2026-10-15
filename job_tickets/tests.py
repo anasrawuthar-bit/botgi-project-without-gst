@@ -7201,6 +7201,124 @@ class InventoryCostingAVCOTests(TestCase):
         self.assertEqual(self.product.unit_price, Decimal("1500.00"))
 
 
+class ClosedJobLockEnforcementTests(TestCase):
+    """Test strict lock enforcement on Closed and Ready for Pickup jobs."""
+
+    def setUp(self):
+        self.ws, self.staff_user = _make_workspace_and_user('staff-lock-user')
+        self.client_obj = self.client
+
+        self.tech_user = User.objects.create_user(username='tech_sam', password='password123')
+        from django.contrib.auth.models import Group
+        tech_group, _ = Group.objects.get_or_create(name='Technicians')
+        self.tech_user.groups.add(tech_group)
+        self.tech_profile = TechnicianProfile.objects.create(
+            workspace=self.ws,
+            user=self.tech_user,
+            unique_id='TECH099',
+        )
+
+        self.job = JobTicket.objects.create(
+            workspace=self.ws,
+            job_code='JOB-LOCK-001',
+            customer_name='Bob Brown',
+            customer_phone='9876543210',
+            device_type='Laptop',
+            reported_issue='Broken Screen',
+            status='Closed',
+            closed_at=timezone.now(),
+            assigned_to=self.tech_profile,
+            created_by=self.staff_user,
+        )
+
+        ServiceLog.objects.create(
+            job_ticket=self.job,
+            description="Screen Replacement",
+            part_cost=Decimal("3000.00"),
+            service_charge=Decimal("500.00"),
+        )
+
+    def test_technician_cannot_change_status_of_closed_job_ajax(self):
+        self.client_obj.force_login(self.tech_user)
+        url = reverse('job_detail_technician', args=[self.job.job_code])
+        response = self.client_obj.post(
+            url,
+            {'action': 'update_status', 'status': 'Under Inspection'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data.get('ok'))
+        self.assertTrue(data.get('is_closed'))
+        self.assertIn("closed and billed", data.get('message', '').lower())
+
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'Closed')
+
+    def test_technician_cannot_change_status_of_closed_job_standard_post(self):
+        self.client_obj.force_login(self.tech_user)
+        url = reverse('job_detail_technician', args=[self.job.job_code])
+        response = self.client_obj.post(
+            url,
+            {'action': 'update_status', 'status': 'Repairing'},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'Closed')
+
+    def test_technician_cannot_add_service_to_closed_job(self):
+        self.client_obj.force_login(self.tech_user)
+        url = reverse('job_detail_technician', args=[self.job.job_code])
+        response = self.client_obj.post(
+            url,
+            {
+                'action': 'add_service_log',
+                'description': 'Extra SSD Install',
+                'part_cost': '2500.00',
+                'service_charge': '300.00',
+            },
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.service_logs.count(), 1)
+
+    def test_technician_cannot_start_or_return_closed_job(self):
+        self.client_obj.force_login(self.tech_user)
+
+        # Mark started
+        url_start = reverse('job_mark_started', args=[self.job.job_code])
+        res_start = self.client_obj.post(url_start)
+        self.assertEqual(res_start.status_code, 302)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'Closed')
+
+        # Return to staff
+        url_return = reverse('technician_return_to_staff', args=[self.job.job_code])
+        res_return = self.client_obj.post(url_return, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(res_return.status_code, 400)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'Closed')
+
+    def test_request_specialized_service_rejects_closed_job(self):
+        self.client_obj.force_login(self.tech_user)
+        url = reverse('request_specialized_service', args=[self.job.job_code])
+        response = self.client_obj.post(url)
+        self.assertEqual(response.status_code, 302)
+        self.job.refresh_from_db()
+        self.assertEqual(self.job.status, 'Closed')
+
+    def test_job_detail_technician_context_locked_for_closed_job(self):
+        self.client_obj.force_login(self.tech_user)
+        url = reverse('job_detail_technician', args=[self.job.job_code])
+        response = self.client_obj.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['is_closed'])
+        self.assertFalse(response.context['can_change_status'])
+        self.assertEqual(response.context['status_choices'], [])
+
+
+
 
 
 
