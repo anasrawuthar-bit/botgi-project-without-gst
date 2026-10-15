@@ -7029,6 +7029,179 @@ class QuickAddProductCategoryTests(TestCase):
         )
 
 
+class InventoryCostingAVCOTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="avcotester", password="password123")
+        apply_staff_access(self.user, ['inventory'])
+        self.workspace = CompanyWorkspace.objects.create(name="AVCO Test Shop", slug="avco-test-shop", owner=self.user)
+        CompanyUserMembership.objects.create(
+            workspace=self.workspace,
+            user=self.user,
+            role="admin",
+            is_active=True
+        )
+        self.supplier = InventoryParty.objects.create(
+            workspace=self.workspace,
+            party_type="supplier",
+            name="Mega Parts Supply"
+        )
+        self.product = Product.objects.create(
+            workspace=self.workspace,
+            name="500GB NVMe SSD",
+            sku="SSD-500-NVME",
+            cost_price=Decimal("0.00"),
+            unit_price=Decimal("0.00"),
+            stock_quantity=0
+        )
+
+    def test_first_purchase_sets_initial_cost_and_auto_markup(self):
+        from .views.helpers import _record_inventory_entries
+        request = RequestFactory().post('/')
+        request.user = self.user
+
+        line_items = [{
+            'product': self.product,
+            'quantity': 10,
+            'unit_price': Decimal("1000.00"),
+            'discount_amount': Decimal("0.00"),
+            'gst_rate': Decimal("0.00"),
+            'notes': 'Initial batch',
+            'serials': []
+        }]
+
+        _record_inventory_entries(
+            request=request,
+            entry_type='purchase',
+            entry_date=timezone.localdate(),
+            party=self.supplier,
+            invoice_number='INV-PUR-001',
+            line_items=line_items,
+        )
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 10)
+        self.assertEqual(self.product.cost_price, Decimal("1000.00"))
+        self.assertEqual(self.product.last_purchase_price, Decimal("1000.00"))
+        # Automatic Option B markup: 30% default when selling price was 0
+        self.assertEqual(self.product.unit_price, Decimal("1300.00"))
+
+    def test_second_purchase_weighted_average_cost(self):
+        from .views.helpers import _record_inventory_entries
+        # Set existing stock: 6 units @ 1000.00, selling @ 1400.00 (40% markup)
+        self.product.stock_quantity = 6
+        self.product.cost_price = Decimal("1000.00")
+        self.product.unit_price = Decimal("1400.00")
+        self.product.save()
+
+        request = RequestFactory().post('/')
+        request.user = self.user
+
+        # Buy 4 units @ 1300.00
+        line_items = [{
+            'product': self.product,
+            'quantity': 4,
+            'unit_price': Decimal("1300.00"),
+            'discount_amount': Decimal("0.00"),
+            'gst_rate': Decimal("0.00"),
+            'notes': 'Restock batch',
+            'serials': []
+        }]
+
+        _record_inventory_entries(
+            request=request,
+            entry_type='purchase',
+            entry_date=timezone.localdate(),
+            party=self.supplier,
+            invoice_number='INV-PUR-002',
+            line_items=line_items,
+        )
+
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, 10)
+        # Expected AVCO: (6 * 1000 + 4 * 1300) / 10 = (6000 + 5200) / 10 = 1120.00
+        self.assertEqual(self.product.cost_price, Decimal("1120.00"))
+        self.assertEqual(self.product.last_purchase_price, Decimal("1300.00"))
+        # Selling price was 1400. Margin against new avg cost 1120 is 20% (>= 15%), and 1400 > 1300, so remains healthy
+        self.assertEqual(self.product.unit_price, Decimal("1400.00"))
+
+    def test_price_spike_exceeding_selling_price_auto_bumps_selling_price(self):
+        from .views.helpers import _record_inventory_entries
+        # Existing stock: 5 units @ 1000.00, selling @ 1200.00
+        self.product.stock_quantity = 5
+        self.product.cost_price = Decimal("1000.00")
+        self.product.unit_price = Decimal("1200.00")
+        self.product.save()
+
+        request = RequestFactory().post('/')
+        request.user = self.user
+
+        # Supplier spikes price to 1500.00 (which exceeds current selling price 1200.00!)
+        line_items = [{
+            'product': self.product,
+            'quantity': 5,
+            'unit_price': Decimal("1500.00"),
+            'discount_amount': Decimal("0.00"),
+            'gst_rate': Decimal("0.00"),
+            'notes': 'Spike batch',
+            'serials': []
+        }]
+
+        _record_inventory_entries(
+            request=request,
+            entry_type='purchase',
+            entry_date=timezone.localdate(),
+            party=self.supplier,
+            invoice_number='INV-PUR-003',
+            line_items=line_items,
+        )
+
+        self.product.refresh_from_db()
+        # AVCO = (5 * 1000 + 5 * 1500) / 10 = 1250.00
+        self.assertEqual(self.product.cost_price, Decimal("1250.00"))
+        self.assertEqual(self.product.last_purchase_price, Decimal("1500.00"))
+        # Option B Auto-protection: Selling price MUST be bumped above purchase rate!
+        self.assertGreater(self.product.unit_price, Decimal("1500.00"))
+
+    def test_price_drop_lowers_avco_without_reducing_selling_price(self):
+        from .views.helpers import _record_inventory_entries
+        # Existing stock: 10 units @ 1000.00, selling @ 1500.00
+        self.product.stock_quantity = 10
+        self.product.cost_price = Decimal("1000.00")
+        self.product.unit_price = Decimal("1500.00")
+        self.product.save()
+
+        request = RequestFactory().post('/')
+        request.user = self.user
+
+        # Price drops to 800.00
+        line_items = [{
+            'product': self.product,
+            'quantity': 10,
+            'unit_price': Decimal("800.00"),
+            'discount_amount': Decimal("0.00"),
+            'gst_rate': Decimal("0.00"),
+            'notes': 'Discount batch',
+            'serials': []
+        }]
+
+        _record_inventory_entries(
+            request=request,
+            entry_type='purchase',
+            entry_date=timezone.localdate(),
+            party=self.supplier,
+            invoice_number='INV-PUR-004',
+            line_items=line_items,
+        )
+
+        self.product.refresh_from_db()
+        # AVCO = (10 * 1000 + 10 * 800) / 20 = 900.00
+        self.assertEqual(self.product.cost_price, Decimal("900.00"))
+        self.assertEqual(self.product.last_purchase_price, Decimal("800.00"))
+        # Selling price is NOT reduced, protecting higher profit margin
+        self.assertEqual(self.product.unit_price, Decimal("1500.00"))
+
+
+
 
 
 

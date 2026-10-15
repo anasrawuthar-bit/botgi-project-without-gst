@@ -73,7 +73,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import never_cache
 from django.contrib import messages
 from django.db.models.functions import Coalesce
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from uuid import uuid4 
@@ -3429,15 +3429,63 @@ def _record_inventory_entries(
                                 'customer_warranty_until', 'updated_at'
                             ])
 
-            # Keep master product pricing fresh from purchases.
-            if entry_type in {'purchase', 'purchase_return'}:
+            # Keep master product pricing fresh from purchases using AVCO (Moving Weighted Average Cost)
+            # and Automatic Markup Protection (Option B).
+            if entry_type == 'purchase':
                 update_fields = []
-                if product.cost_price != unit_price:
-                    product.cost_price = unit_price
+                new_purchase_rate = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                qty_dec = Decimal(str(quantity))
+                prev_cost = (product.cost_price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                prev_stock = Decimal(str(stock_before))
+
+                # 1. Moving Weighted Average Cost (AVCO)
+                if prev_stock <= Decimal('0.00') or prev_cost <= Decimal('0.00'):
+                    new_avg_cost = new_purchase_rate
+                else:
+                    tot_val = (prev_stock * prev_cost) + (qty_dec * new_purchase_rate)
+                    tot_qty = prev_stock + qty_dec
+                    new_avg_cost = tot_val / tot_qty if tot_qty > Decimal('0.00') else new_purchase_rate
+
+                new_avg_cost = new_avg_cost.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if product.cost_price != new_avg_cost:
+                    product.cost_price = new_avg_cost
                     update_fields.append('cost_price')
-                if (product.unit_price or Decimal('0.00')) <= 0 and unit_price > 0:
-                    product.unit_price = unit_price
+
+                # 2. Track most recent purchase invoice rate
+                if product.last_purchase_price != new_purchase_rate:
+                    product.last_purchase_price = new_purchase_rate
+                    update_fields.append('last_purchase_price')
+
+                # 3. Automatic Markup Protection (Option B)
+                curr_sp = (product.unit_price or Decimal('0.00')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if curr_sp <= Decimal('0.00'):
+                    # Initial selling price default: 30% markup over cost
+                    product.unit_price = (new_avg_cost * Decimal('1.30')).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
                     update_fields.append('unit_price')
+                else:
+                    # Check if selling price is compromised (selling at a loss or margin squeezed)
+                    prev_ratio = (curr_sp / prev_cost) if prev_cost > Decimal('0.00') else Decimal('1.25')
+                    target_ratio = max(prev_ratio, Decimal('1.25'))
+                    is_selling_at_loss = curr_sp <= new_avg_cost or curr_sp < new_purchase_rate
+                    current_margin = (curr_sp - new_avg_cost) / curr_sp if curr_sp > Decimal('0.00') else Decimal('0.00')
+                    is_low_margin = current_margin < Decimal('0.15')
+
+                    if is_selling_at_loss or (new_purchase_rate > prev_cost and is_low_margin):
+                        base_cost = max(new_avg_cost, new_purchase_rate)
+                        suggested_sp = (base_cost * target_ratio).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                        if suggested_sp > curr_sp:
+                            product.unit_price = suggested_sp
+                            update_fields.append('unit_price')
+
+                product.stock_quantity = stock_after
+                update_fields.append('stock_quantity')
+                product.save(update_fields=update_fields)
+            elif entry_type == 'purchase_return':
+                update_fields = []
+                new_purchase_rate = Decimal(str(unit_price)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if product.last_purchase_price != new_purchase_rate:
+                    product.last_purchase_price = new_purchase_rate
+                    update_fields.append('last_purchase_price')
                 product.stock_quantity = stock_after
                 update_fields.append('stock_quantity')
                 product.save(update_fields=update_fields)
@@ -6479,6 +6527,7 @@ def _inventory_entry_dashboard(request, entry_type):
             'name': p.name,
             'sku': p.sku or '',
             'cost_price': float(p.cost_price or Decimal('0.00')),
+            'last_purchase_price': float(p.last_purchase_price) if p.last_purchase_price is not None else None,
             'unit_price': float(p.unit_price or Decimal('0.00')),
             'stock_quantity': p.stock_quantity,
             'reserved_stock': p.reserved_stock,

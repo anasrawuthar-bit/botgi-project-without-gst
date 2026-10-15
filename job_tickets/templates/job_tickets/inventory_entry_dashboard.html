@@ -2988,9 +2988,28 @@ function initInventoryEntryDashboard() {
         }
 
         const costPrice = Number(prod.cost_price || 0);
+        const lastPurPrice = (prod.last_purchase_price !== null && prod.last_purchase_price !== undefined) ? Number(prod.last_purchase_price) : null;
         const unitPrice = Number(prod.unit_price || 0);
+        const qty = Math.max(1, parseNumber(row.querySelector('input[name="line_quantity[]"]')?.value) || 1);
         const enteredRate = parseNumber(row.querySelector('input[name="line_unit_price[]"]')?.value) || (entryType === 'purchase' ? costPrice : unitPrice);
-        if (erpInsightCost) erpInsightCost.textContent = '₹ ' + (entryType === 'purchase' ? enteredRate : costPrice).toFixed(2);
+
+        if (erpInsightCost) {
+            if (entryType === 'purchase') {
+                let projCost = costPrice;
+                if (stock <= 0 || costPrice <= 0) {
+                    projCost = enteredRate;
+                } else {
+                    projCost = ((stock * costPrice) + (qty * enteredRate)) / (stock + qty);
+                }
+                let costHtml = `₹ ${enteredRate.toFixed(2)}`;
+                if (costPrice > 0 && Math.abs(enteredRate - costPrice) > 0.01) {
+                    costHtml += ` <span class="text-muted fw-normal" style="font-size: 0.72rem;">(Avg: ₹${costPrice.toFixed(2)} &rarr; Proj: ₹${projCost.toFixed(2)})</span>`;
+                }
+                erpInsightCost.innerHTML = costHtml;
+            } else {
+                erpInsightCost.textContent = '₹ ' + costPrice.toFixed(2);
+            }
+        }
         if (erpInsightRate) erpInsightRate.textContent = '₹ ' + unitPrice.toFixed(2);
 
         if (erpInsightMarginWrap && erpInsightMargin) {
@@ -3002,7 +3021,7 @@ function initInventoryEntryDashboard() {
             } else if (entryType === 'purchase' && unitPrice > 0 && enteredRate > 0) {
                 const margin = ((unitPrice - enteredRate) / enteredRate) * 100;
                 if (margin < 0) {
-                    erpInsightMargin.textContent = margin.toFixed(1) + '% (Loss Warning!)';
+                    erpInsightMargin.textContent = margin.toFixed(1) + '% (Auto-Markup Protects Margin)';
                     erpInsightMargin.className = 'font-monospace text-danger fw-bold';
                 } else {
                     erpInsightMargin.textContent = '+' + margin.toFixed(1) + '%';
@@ -3030,8 +3049,20 @@ function initInventoryEntryDashboard() {
                     alertSpan = document.createElement('span');
                     erpInsightAlert.appendChild(alertSpan);
                 }
-                alertSpan.className = 'badge bg-danger text-white border border-danger font-monospace';
-                alertSpan.innerHTML = `<i class="fas fa-triangle-exclamation me-1"></i>Cost ₹${enteredRate.toFixed(2)} exceeds retail price ₹${unitPrice.toFixed(2)}!`;
+                alertSpan.className = 'badge bg-warning text-dark border border-warning font-monospace';
+                alertSpan.innerHTML = `<i class="fas fa-shield-halved me-1"></i>Rate ₹${enteredRate.toFixed(2)} exceeds retail ₹${unitPrice.toFixed(2)} (Selling price will auto-bump on save to protect margin)`;
+                erpInsightAlert.classList.remove('d-none');
+            } else if (entryType === 'purchase' && lastPurPrice !== null && Math.abs(enteredRate - lastPurPrice) > 0.01) {
+                let alertSpan = erpInsightAlert.querySelector('span');
+                if (!alertSpan) {
+                    alertSpan = document.createElement('span');
+                    erpInsightAlert.appendChild(alertSpan);
+                }
+                const diff = enteredRate - lastPurPrice;
+                const diffPct = (diff / lastPurPrice) * 100;
+                const diffText = diff > 0 ? `+₹${diff.toFixed(2)} (+${diffPct.toFixed(1)}%)` : `-₹${Math.abs(diff).toFixed(2)} (${diffPct.toFixed(1)}%)`;
+                alertSpan.className = `badge ${diff > 0 ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : 'bg-success-subtle text-success border border-success-subtle'} font-monospace`;
+                alertSpan.innerHTML = `<i class="fas fa-chart-line me-1"></i>Rate vs Last Purchase: ${diffText}`;
                 erpInsightAlert.classList.remove('d-none');
             } else {
                 erpInsightAlert.classList.add('d-none');

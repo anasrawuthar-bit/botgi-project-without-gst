@@ -774,6 +774,7 @@
                         <option value="{{ product.id }}"
                                 data-price="{{ product.unit_price }}"
                                 data-cost="{{ product.cost_price|default:0 }}"
+                                data-last-cost="{{ product.last_purchase_price|default:'' }}"
                                 data-stock="{{ product.stock_quantity }}"
                                 data-sku="{{ product.sku|default:'' }}"
                                 data-category="{{ product.category|default:'' }}"
@@ -1442,9 +1443,14 @@ document.addEventListener('DOMContentLoaded', function() {
             qtyInput.max = stock > 0 ? String(stock) : '';
         }
 
-        // Purchase Price display
+        // Purchase Price display (AVCO Weighted Average + Latest Vendor Rate)
         if (purchasePriceDisplay) {
-            purchasePriceDisplay.innerHTML = `Buy: <strong>${formatCurrency(costPrice)}</strong>`;
+            let buyText = `Buy (Avg): <strong>${formatCurrency(costPrice)}</strong>`;
+            const lastCost = selectedOption.dataset.lastCost ? parseFloat(selectedOption.dataset.lastCost) : null;
+            if (lastCost !== null && !isNaN(lastCost) && Math.abs(lastCost - costPrice) > 0.01) {
+                buyText += `<div class="text-muted" style="font-size: 0.68rem;" title="Latest Vendor Purchase Rate">Last: ${formatCurrency(lastCost)}</div>`;
+            }
+            purchasePriceDisplay.innerHTML = buyText;
         }
 
         // SKU & Stock hints
@@ -1824,6 +1830,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         sku: opt.dataset.sku || '',
                         stock: parseInt(opt.dataset.stock || '0', 10),
                         cost: parseFloat(opt.dataset.cost || 0),
+                        lastCost: opt.dataset.lastCost ? parseFloat(opt.dataset.lastCost) : null,
                         price: parseFloat(opt.dataset.price || 0),
                         category: opt.dataset.category || '',
                         brand: opt.dataset.brand || '',

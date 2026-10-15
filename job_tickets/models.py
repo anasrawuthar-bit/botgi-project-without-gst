@@ -315,7 +315,15 @@ class Product(models.Model):
         max_digits=10,
         decimal_places=2,
         default=0,
-        help_text="Internal purchase/stock cost per unit for profit calculations.",
+        help_text="Weighted average purchase/stock cost per unit (AVCO) for profit calculations.",
+    )
+    last_purchase_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        default=None,
+        help_text="Most recent purchase invoice rate per unit.",
     )
     gst_rate = models.DecimalField(
         max_digits=5,
