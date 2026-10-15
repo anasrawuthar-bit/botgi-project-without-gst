@@ -179,11 +179,6 @@ class StaffDashboardConsumer(WebsocketConsumer):
             staff_group_name(self.workspace_id),
             self.channel_name
         )
-        if self.workspace_id:
-            async_to_sync(self.channel_layer.group_add)(
-                staff_group_name(None),
-                self.channel_name
-            )
         async_to_sync(self.channel_layer.group_add)(
             staff_tasks_group_name(self.workspace_id),
             self.channel_name
@@ -191,19 +186,15 @@ class StaffDashboardConsumer(WebsocketConsumer):
         self.accept()
 
     def disconnect(self, close_code):
-        async_to_sync(self.channel_layer.group_discard)(
-            staff_group_name(self.workspace_id),
-            self.channel_name
-        )
-        if hasattr(self, 'workspace_id') and self.workspace_id:
+        if hasattr(self, 'workspace_id'):
             async_to_sync(self.channel_layer.group_discard)(
-                staff_group_name(None),
+                staff_group_name(self.workspace_id),
                 self.channel_name
             )
-        async_to_sync(self.channel_layer.group_discard)(
-            staff_tasks_group_name(self.workspace_id),
-            self.channel_name
-        )
+            async_to_sync(self.channel_layer.group_discard)(
+                staff_tasks_group_name(self.workspace_id),
+                self.channel_name
+            )
 
     def receive(self, text_data):
         pass
@@ -217,7 +208,7 @@ class StaffDashboardConsumer(WebsocketConsumer):
 
     def task_feed_event(self, event):
         self.send(text_data=json.dumps(event))
-        
+
 
 class TechnicianDashboardConsumer(WebsocketConsumer):
     # This consumer handles connections for the Technician Dashboard
@@ -239,42 +230,23 @@ class TechnicianDashboardConsumer(WebsocketConsumer):
             tech_group_name(self.workspace_id),
             self.channel_name
         )
-        if self.workspace_id:
-            async_to_sync(self.channel_layer.group_add)(
-                tech_group_name(None),
-                self.channel_name
-            )
         async_to_sync(self.channel_layer.group_add)(
             tech_tasks_group_name(self.workspace_id, self.tech_id),
             self.channel_name
         )
-        if self.workspace_id:
-            async_to_sync(self.channel_layer.group_add)(
-                tech_tasks_group_name(None, self.tech_id),
-                self.channel_name
-            )
         self.accept()
 
     def disconnect(self, close_code):
-        async_to_sync(self.channel_layer.group_discard)(
-            tech_group_name(self.workspace_id),
-            self.channel_name
-        )
-        if hasattr(self, 'workspace_id') and self.workspace_id:
+        if hasattr(self, 'workspace_id'):
             async_to_sync(self.channel_layer.group_discard)(
-                tech_group_name(None),
+                tech_group_name(self.workspace_id),
                 self.channel_name
             )
-        if hasattr(self, 'tech_id'):
+        if hasattr(self, 'tech_id') and hasattr(self, 'workspace_id'):
             async_to_sync(self.channel_layer.group_discard)(
                 tech_tasks_group_name(self.workspace_id, self.tech_id),
                 self.channel_name
             )
-            if hasattr(self, 'workspace_id') and self.workspace_id:
-                async_to_sync(self.channel_layer.group_discard)(
-                    tech_tasks_group_name(None, self.tech_id),
-                    self.channel_name
-                )
         
     def receive(self, text_data):
         pass

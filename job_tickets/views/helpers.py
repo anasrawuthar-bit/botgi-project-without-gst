@@ -1613,7 +1613,7 @@ def get_phone_service_snapshot(phone, workspace=None):
 
 # --- HELPER FUNCTION FOR WEBSOCKET UPDATES ---
 
-def send_job_update_message(job_code, new_status, old_status=None):
+def send_job_update_message(job_code, new_status, old_status=None, is_assignment=False):
     """Utility to send a real-time status update to all clients watching jobs."""
     try:
         from channels.layers import get_channel_layer
@@ -1649,17 +1649,14 @@ def send_job_update_message(job_code, new_status, old_status=None):
                 'device': device_str,
                 'assigned_tech_id': tech_id,
                 'assigned_tech_username': tech_user,
+                'is_assignment': is_assignment,
             }
             async_to_sync(channel_layer.group_send)(staff_group_name(workspace_id), message)
-            if workspace_id:
-                async_to_sync(channel_layer.group_send)(staff_group_name(None), message)
-
             async_to_sync(channel_layer.group_send)(tech_group_name(workspace_id), message)
-            if workspace_id:
-                async_to_sync(channel_layer.group_send)(tech_group_name(None), message)
 
-            # Send assignment alert directly to the technician's private feed
-            if tech_id:
+            # Send assignment alert directly to the technician's private feed ONLY on real assignments
+            # and never when a job is closed or completed
+            if is_assignment and tech_id and new_status not in ['Closed', 'Completed', 'Ready for Pickup']:
                 personal_event = {
                     'type': 'task_feed_event',
                     'action': 'job_assigned',
@@ -1671,8 +1668,6 @@ def send_job_update_message(job_code, new_status, old_status=None):
                     'technician_username': tech_user,
                 }
                 async_to_sync(channel_layer.group_send)(tech_tasks_group_name(workspace_id, tech_id), personal_event)
-                if workspace_id:
-                    async_to_sync(channel_layer.group_send)(tech_tasks_group_name(None, tech_id), personal_event)
             
             async_to_sync(channel_layer.group_send)(job_group_name(workspace_id, job_code), message)
     except Exception as e:

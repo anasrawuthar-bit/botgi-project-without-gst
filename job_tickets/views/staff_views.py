@@ -662,7 +662,7 @@ def staff_dashboard(request):
                 JobTicketLog.objects.create(job_ticket=job_to_assign, user=request.user, action='ASSIGNED', details=details)
 
             # Send WebSocket update for real-time job assignment notification
-            send_job_update_message(job_to_assign.job_code, job_to_assign.status, old_status=old_status)
+            send_job_update_message(job_to_assign.job_code, job_to_assign.status, old_status=old_status, is_assignment=True)
 
             messages.success(request, f"Job {job_to_assign.job_code} assigned to {technician.user.username}.")
             return redirect('staff_dashboard')
@@ -2943,7 +2943,7 @@ def job_reassign_staff(request, job_code):
             details = f"Reassigned from '{old_technician_name}' to '{new_technician_name}' by staff."
             JobTicketLog.objects.create(job_ticket=job, user=request.user, action='ASSIGNED', details=details)
 
-            send_job_update_message(job.job_code, job.status)
+            send_job_update_message(job.job_code, job.status, is_assignment=bool(new_technician))
 
         messages.success(request, f"Job {job_code} successfully reassigned to {new_technician_name}.")
         return redirect('staff_job_detail', job_code=job_code)

@@ -312,14 +312,16 @@ document.addEventListener('DOMContentLoaded', function() {
                         const newStatus = data.status;
                         console.log(`Live update received: Job ${jobCode} status changed to ${newStatus}.`);
 
-                        // If assigned to current technician, alert them
-                        if (data.assigned_tech_username && data.assigned_tech_username === currentUsername) {
+                        // Only alert if this is an explicit assignment event for this technician
+                        if (data.is_assignment && data.assigned_tech_username && data.assigned_tech_username === currentUsername) {
                             showJobAssignedAlert(data);
                         }
                         fetchActiveJobs();
                     } else if (data.type === 'job_assigned' || (data.type === 'task_feed_event' && data.action === 'job_assigned')) {
                         console.log(`Live job assignment received: Job ${data.job_code}`);
-                        showJobAssignedAlert(data);
+                        if (!data.technician_username || data.technician_username === currentUsername) {
+                            showJobAssignedAlert(data);
+                        }
                         fetchActiveJobs();
                     } else if (data.type === 'task_feed_event') {
                         if (data.action === 'task_created' || data.action === 'task_assigned') {
@@ -365,9 +367,27 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (_) {}
     }
 
+    const recentlyAlertedJobs = new Map();
+
     function showJobAssignedAlert(data) {
-        playChime();
         const jobCode = data.job_code || 'Job';
+        const status = data.status;
+
+        // Never alert on closed, completed, or ready for pickup jobs
+        if (status === 'Closed' || status === 'Completed' || status === 'Ready for Pickup') {
+            return;
+        }
+
+        // Deduplicate: prevent alert bursts for the same job within 15 seconds
+        const now = Date.now();
+        const lastAlert = recentlyAlertedJobs.get(jobCode) || 0;
+        if (now - lastAlert < 15000) {
+            console.log(`Suppressing duplicate job assignment alert for ${jobCode}`);
+            return;
+        }
+        recentlyAlertedJobs.set(jobCode, now);
+
+        playChime();
         const deviceDesc = data.device || 'New Repair Ticket';
         const custDesc = data.customer_name ? `Customer: ${data.customer_name}` : '';
 
@@ -377,6 +397,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const notif = new Notification('New Job Assigned: ' + jobCode, {
                 body: `${deviceDesc}\n${custDesc}`,
                 icon: '/static/img/logo.png',
+                tag: 'job-assigned-' + jobCode,
+                renotify: false,
                 data: { url: jobUrl }
             });
             notif.onclick = function () {
