@@ -1219,6 +1219,32 @@ def get_monthly_summary_context(
     direct_stock_sales_profit = direct_stock_sales_revenue - direct_stock_sales_cogs
     direct_stock_sales_units = sum((e.quantity or 0 for e in direct_sales_entries), 0) - sum((e.quantity or 0 for e in direct_return_entries), 0)
 
+    purchase_entries = list(
+        scope_to_workspace(
+            InventoryEntry.objects.filter(
+                entry_type='purchase',
+                entry_date__gte=period_start_date,
+                entry_date__lt=period_end_date,
+            ),
+            workspace,
+        )
+    )
+    purchase_return_entries = list(
+        scope_to_workspace(
+            InventoryEntry.objects.filter(
+                entry_type='purchase_return',
+                entry_date__gte=period_start_date,
+                entry_date__lt=period_end_date,
+            ),
+            workspace,
+        )
+    )
+    stock_purchases_total = max(
+        Decimal('0.00'),
+        sum((e.total_amount or Decimal('0.00') for e in purchase_entries), Decimal('0.00')) -
+        sum((e.total_amount or Decimal('0.00') for e in purchase_return_entries), Decimal('0.00'))
+    )
+
     vendor_services_in_period = SpecializedService.objects.filter(job_ticket__in=monthly_closed_jobs)
     vendor_expense = sum_vendor_net_cost(vendor_services_in_period)
     vendor_revenue = vendor_services_in_period.aggregate(
@@ -1398,6 +1424,20 @@ def get_monthly_summary_context(
         'period_overhead_expenses': period_overhead_expenses,
         'period_total_expenses': period_total_expenses,
         'period_net_profit': period_net_profit,
+
+        # Chart Streams Data
+        'stock_purchases_total': stock_purchases_total,
+        'total_graph_revenue': service_parts_revenue + service_labor_revenue + stock_sales_income + vendor_revenue,
+        'total_graph_outflow': stock_purchases_total + period_overhead_expenses + vendor_expense,
+        'financial_streams_chart_json': json.dumps({
+            'service_parts': float(service_parts_revenue),
+            'service_labor': float(service_labor_revenue),
+            'stock_sales': float(stock_sales_income),
+            'stock_purchases': float(stock_purchases_total),
+            'expenses': float(period_overhead_expenses),
+            'vendor_expense': float(vendor_expense),
+            'vendor_revenue': float(vendor_revenue),
+        }),
 
         # Liquidity & Financial Accounts Summary
         'financial_accounts': list(

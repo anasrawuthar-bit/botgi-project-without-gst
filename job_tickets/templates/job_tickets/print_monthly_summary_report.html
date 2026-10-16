@@ -162,6 +162,11 @@
     .financial-report .row {
         break-inside: avoid;
     }
+
+    #financial-graph-container {
+        display: block !important;
+        break-inside: avoid;
+    }
 }
 </style>
 {% endblock %}
@@ -561,18 +566,52 @@
     </div>
     {% endif %}
 
-    <!-- 5. DETAILED CLOSED JOB FINANCIAL SUMMARY TABLE -->
+    <!-- 5. FINANCIAL STREAMS: GRAPH & SUMMARY TABLE -->
     <div class="card-box mb-4">
-        <div class="section-title-line">
-            <i class="fas fa-sack-dollar text-primary"></i>
-            <h2>Closed Job Financial Summary</h2>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <div class="section-title-line mb-0">
+                <i class="fas fa-chart-column text-primary"></i>
+                <h2>Financial Streams &amp; Summary</h2>
+            </div>
+            <!-- View Mode Switcher -->
+            <div class="btn-group btn-group-sm no-print" role="group" id="financial-view-toggle">
+                <button type="button" class="btn btn-primary active" id="btn-show-graph" onclick="switchFinancialView('graph')">
+                    <i class="fas fa-chart-bar me-1"></i>Graph View
+                </button>
+                <button type="button" class="btn btn-outline-secondary" id="btn-show-table" onclick="switchFinancialView('table')">
+                    <i class="fas fa-table me-1"></i>Table View
+                </button>
+            </div>
         </div>
         <p class="text-muted small mb-3">
-            Itemized breakdown of parts, labor, stock sales, vendor outsourced services, and discounts for the {{ jobs_closed_count }} jobs closed in this period.
+            Comparative analysis of revenue streams (Service Parts, Labor, Stock Sales) vs. operating outflows (Stock Purchases, Overhead Expenses, Vendor Costs) for this period.
         </p>
 
-        <div class="table-responsive">
-            <table class="table table-striped table-hover align-middle">
+        <!-- Animated Graph View (Default) -->
+        <div id="financial-graph-container" class="mb-2">
+            <div class="chart-wrapper p-3 rounded-3 border bg-white shadow-sm" style="position: relative; height: 350px;">
+                <canvas id="financialStreamsChart"></canvas>
+            </div>
+            <!-- Quick Summary Badges under Graph -->
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 pt-2 border-top small">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                        <i class="fas fa-arrow-down-left me-1"></i>Revenue Inflows: &#8377;{{ total_graph_revenue|floatformat:2 }}
+                    </span>
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                        <i class="fas fa-arrow-up-right me-1"></i>Costs &amp; Outflows: &#8377;{{ total_graph_outflow|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="text-muted small">
+                    <span class="fw-semibold text-dark">True Net Operating Profit:</span> 
+                    <strong class="text-success font-monospace">&#8377;{{ period_net_profit|floatformat:2 }}</strong> ({{ overall_margin|floatformat:1 }}% Margin)
+                </div>
+            </div>
+        </div>
+
+        <!-- Table View (Toggleable) -->
+        <div id="financial-table-container" class="table-responsive d-none">
+            <table class="table table-striped table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
                         <th>Block</th>
@@ -759,4 +798,158 @@
 
 {% block extra_js %}
 {% include "job_tickets/includes/print_flow_script.html" %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script>
+let financialStreamsChartInstance = null;
+
+function switchFinancialView(viewMode) {
+    const graphContainer = document.getElementById('financial-graph-container');
+    const tableContainer = document.getElementById('financial-table-container');
+    const btnGraph = document.getElementById('btn-show-graph');
+    const btnTable = document.getElementById('btn-show-table');
+
+    if (!graphContainer || !tableContainer) return;
+
+    if (viewMode === 'graph') {
+        graphContainer.classList.remove('d-none');
+        tableContainer.classList.add('d-none');
+        if (btnGraph) btnGraph.className = 'btn btn-primary active';
+        if (btnTable) btnTable.className = 'btn btn-outline-secondary';
+        if (financialStreamsChartInstance) {
+            financialStreamsChartInstance.resize();
+        }
+    } else {
+        graphContainer.classList.add('d-none');
+        tableContainer.classList.remove('d-none');
+        if (btnGraph) btnGraph.className = 'btn btn-outline-secondary';
+        if (btnTable) btnTable.className = 'btn btn-primary active';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const canvas = document.getElementById('financialStreamsChart');
+    if (!canvas || typeof Chart === 'undefined') return;
+
+    const chartRaw = {{ financial_streams_chart_json|default:"{}"|safe }};
+    const ctx = canvas.getContext('2d');
+
+    const labels = [
+        'Service Parts',
+        'Service Labor',
+        'Stock Sales',
+        'Stock Purchases',
+        'Shop Expenses',
+        'Vendor Costs'
+    ];
+
+    const values = [
+        Number(chartRaw.service_parts || 0),
+        Number(chartRaw.service_labor || 0),
+        Number(chartRaw.stock_sales || 0),
+        Number(chartRaw.stock_purchases || 0),
+        Number(chartRaw.expenses || 0),
+        Number(chartRaw.vendor_expense || 0),
+    ];
+
+    const backgroundColors = [
+        'rgba(16, 185, 129, 0.85)',  // Emerald Green (Service Parts)
+        'rgba(14, 165, 233, 0.85)',  // Sky Blue (Service Labor)
+        'rgba(99, 102, 241, 0.85)',  // Indigo (Stock Sales)
+        'rgba(249, 115, 22, 0.85)',  // Orange (Stock Purchases)
+        'rgba(239, 68, 68, 0.85)',   // Red (Shop Expenses)
+        'rgba(245, 158, 11, 0.85)',  // Amber (Vendor Costs)
+    ];
+
+    const borderColors = [
+        '#059669',
+        '#0284c7',
+        '#4f46e5',
+        '#ea580c',
+        '#dc2626',
+        '#d97706',
+    ];
+
+    const flowTypes = [
+        'Revenue Inflow',
+        'Revenue Inflow',
+        'Revenue Inflow',
+        'Inventory Outflow',
+        'Operating Outflow',
+        'Vendor Outflow'
+    ];
+
+    financialStreamsChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Amount (₹)',
+                data: values,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1.5,
+                borderRadius: 6,
+                borderSkipped: false,
+                barPercentage: 0.62,
+                categoryPercentage: 0.85
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 900,
+                easing: 'easeOutQuart'
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    backgroundColor: '#0f172a',
+                    titleFont: { size: 13, weight: 'bold' },
+                    bodyFont: { size: 12 },
+                    padding: 10,
+                    cornerRadius: 6,
+                    callbacks: {
+                        label: function(context) {
+                            const val = context.raw || 0;
+                            const type = flowTypes[context.dataIndex] || '';
+                            return [
+                                ` Amount: ₹${val.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                                ` Stream Type: ${type}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: {
+                        color: 'rgba(226, 232, 240, 0.6)',
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: { family: "'Space Grotesk', system-ui, sans-serif", size: 11 },
+                        callback: function(value) {
+                            return '₹' + Number(value).toLocaleString('en-IN');
+                        }
+                    }
+                },
+                y: {
+                    grid: {
+                        display: false,
+                        drawBorder: false
+                    },
+                    ticks: {
+                        font: { family: "'Plus Jakarta Sans', system-ui, sans-serif", weight: '600', size: 12 },
+                        color: '#334155'
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
 {% endblock %}
