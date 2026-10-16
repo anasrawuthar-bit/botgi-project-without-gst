@@ -1272,6 +1272,23 @@ def job_billing_staff(request, job_code):
                                     action='SERVICE',
                                     details=f"Restocked {product.name} by {product_sale_entry.quantity} after deleting product sale line.",
                                 )
+                                # Release any serial number consumed in this job for this product/sale entry
+                                if product.has_serial_tracking:
+                                    serials_to_release = ProductItemSerial.objects.filter(
+                                        job_ticket=job,
+                                        product=product,
+                                        status=ProductItemSerial.STATUS_CONSUMED_IN_JOB,
+                                    )
+                                    if product_sale_entry.inventory_entry_id:
+                                        serials_to_release = serials_to_release.filter(sale_entry_id=product_sale_entry.inventory_entry_id)
+                                    serials_to_release.update(
+                                        status=ProductItemSerial.STATUS_IN_STOCK,
+                                        job_ticket=None,
+                                        sale_entry=None,
+                                        sale_date=None,
+                                        sale_price=Decimal('0.00'),
+                                        customer_warranty_until=None,
+                                    )
                             if product_sale_entry.inventory_entry_id:
                                 product_sale_entry.inventory_entry.delete()
                         elif parsed_product_sale:
@@ -1296,6 +1313,7 @@ def job_billing_staff(request, job_code):
                     product_quantities = request.POST.getlist('product_qty[]')
                     product_unit_prices = request.POST.getlist('product_unit_price[]')
                     product_service_charges = request.POST.getlist('product_service_charge[]')
+                    product_serials = request.POST.getlist('product_serial[]')
                     customer_party = _get_or_create_inventory_customer_party_for_job(job)
                     inventory_sale_bill = (
                         InventoryBill.objects.select_for_update()
@@ -1433,6 +1451,32 @@ def job_billing_staff(request, job_code):
                         product.stock_quantity = stock_after
                         product.save(update_fields=['stock_quantity', 'updated_at'])
 
+                        raw_serial = (product_serials[index] if index < len(product_serials) else '').strip()
+                        if raw_serial:
+                            item_serial = ProductItemSerial.objects.filter(
+                                workspace=job.workspace,
+                                product=product,
+                                serial_number__iexact=raw_serial,
+                            ).first()
+                            if item_serial:
+                                if item_serial.status != ProductItemSerial.STATUS_IN_STOCK and item_serial.job_ticket_id != job.id:
+                                    raise ValueError(f"Serial number '{raw_serial}' is no longer available in stock.")
+                                customer_warranty_until = None
+                                if product.customer_warranty_months > 0:
+                                    from dateutil.relativedelta import relativedelta
+                                    customer_warranty_until = sale_entry_date + relativedelta(months=product.customer_warranty_months)
+
+                                item_serial.status = ProductItemSerial.STATUS_CONSUMED_IN_JOB
+                                item_serial.job_ticket = job
+                                item_serial.sale_entry = inventory_sale_entry
+                                item_serial.sale_date = sale_entry_date
+                                item_serial.sale_price = unit_price
+                                item_serial.customer_warranty_until = customer_warranty_until
+                                item_serial.save(update_fields=[
+                                    'status', 'job_ticket', 'sale_entry', 'sale_date', 'sale_price',
+                                    'customer_warranty_until', 'updated_at'
+                                ])
+
                         JobTicketLog.objects.create(
                             job_ticket=job,
                             user=request.user,
@@ -1441,7 +1485,8 @@ def job_billing_staff(request, job_code):
                                 f"Added product sale: {product.name} x{quantity} at Rs {product.unit_price} each "
                                 f"(Revenue: Rs {line_total}, Service Charge: Rs {product_service_charge}, "
                                 f"Cost: Rs {line_cost}, Profit: Rs {line_profit}, "
-                                f"Sale Invoice: {new_vyapar_invoice})."
+                                f"Sale Invoice: {new_vyapar_invoice})"
+                                + (f" with S/N: {raw_serial}" if raw_serial else "") + "."
                             ),
                         )
 
@@ -1523,6 +1568,35 @@ def job_billing_staff(request, job_code):
         products_qs = products_qs.filter(workspace=job.workspace)
     products_for_sale = products_qs.order_by('name')
 
+    in_stock_serials = ProductItemSerial.objects.filter(
+        workspace=job.workspace,
+        status=ProductItemSerial.STATUS_IN_STOCK,
+    ).values('product_id', 'serial_number')
+
+    consumed_serials_qs = ProductItemSerial.objects.filter(
+        job_ticket=job,
+        status=ProductItemSerial.STATUS_CONSUMED_IN_JOB,
+    ).values('product_id', 'serial_number')
+
+    available_serials_map = {}
+    available_serials_by_number = {}
+
+    for s in list(in_stock_serials) + list(consumed_serials_qs):
+        pid_str = str(s['product_id'])
+        sn = s['serial_number']
+        if pid_str not in available_serials_map:
+            available_serials_map[pid_str] = []
+        if sn not in available_serials_map[pid_str]:
+            available_serials_map[pid_str].append(sn)
+        available_serials_by_number[sn.strip().upper()] = {
+            'product_id': s['product_id'],
+            'serial_number': sn,
+        }
+
+    available_serials_json = json.dumps(available_serials_map)
+    available_serials_by_number_json = json.dumps(available_serials_by_number)
+    consumed_serials = list(job.consumed_serials.select_related('product').all())
+
     from ..models import ItemCategory
     item_cats_qs = ItemCategory.objects.all()
     if job.workspace:
@@ -1538,6 +1612,9 @@ def job_billing_staff(request, job_code):
         'pure_service_logs': pure_service_logs,
         'existing_product_sales': existing_product_sales,
         'products_for_sale': products_for_sale,
+        'available_serials_json': available_serials_json,
+        'available_serials_by_number_json': available_serials_by_number_json,
+        'consumed_serials': consumed_serials,
         'item_categories': item_categories,
         'total_parts_cost': job.part_total,
         'total_service_charges': job.service_total,

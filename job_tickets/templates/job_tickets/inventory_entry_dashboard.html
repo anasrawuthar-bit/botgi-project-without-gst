@@ -1804,6 +1804,7 @@ function initInventoryEntryDashboard() {
     const partyBalances = {{ party_balances_json|safe|default:"{}" }};
     const productsCatalog = {{ products_catalog_json|safe|default:"{}" }};
     const availableSerials = {{ available_serials_json|safe|default:"{}" }};
+    const availableSerialsByNumber = {{ available_serials_by_number_json|safe|default:"{}" }};
     const trackSerialUrl = "{% url 'inventory_track_serial' %}";
     const walkinCustomerId = "{{ walkin_customer_id }}";
     const walkinCustomerName = "{{ walkin_customer_name }}";
@@ -2140,7 +2141,28 @@ function initInventoryEntryDashboard() {
 
             hasExactMatch = Boolean(query && allOptions.some((opt) => normalizeText(opt.label) === query));
 
-            const matches = allOptions.filter((option) => {
+            // Serial-First Search & Barcode Scan: Search in-stock serial numbers
+            const serialMatches = [];
+            if (!isParty && rawQuery && typeof availableSerialsByNumber !== 'undefined') {
+                const queryUpper = rawQuery.toUpperCase();
+                Object.keys(availableSerialsByNumber).forEach((key) => {
+                    if (key === queryUpper || key.includes(queryUpper)) {
+                        const sInfo = availableSerialsByNumber[key];
+                        const opt = allOptions.find((o) => String(o.value) === String(sInfo.product_id));
+                        if (opt) {
+                            serialMatches.push({
+                                isSerialMatch: true,
+                                serial: sInfo.serial_number,
+                                option: opt,
+                                label: `${opt.label} [S/N: ${sInfo.serial_number}]`,
+                                value: opt.value,
+                            });
+                        }
+                    }
+                });
+            }
+
+            const standardMatches = allOptions.filter((option) => {
                 if (!query) return true;
                 const labelMatch = normalizeText(option.label).includes(query);
                 const skuMatch = option.sku && normalizeText(option.sku).includes(query);
@@ -2148,16 +2170,44 @@ function initInventoryEntryDashboard() {
                 return labelMatch || skuMatch || phoneMatch;
             });
 
+            const matches = [...serialMatches, ...standardMatches];
             currentMatches = matches;
-            const canAddNew = Boolean(extraOptions.onAddNew && !hasExactMatch);
+            const canAddNew = Boolean(extraOptions.onAddNew && !hasExactMatch && serialMatches.length === 0);
             highlightedIndex = matches.length > 0 ? 0 : (canAddNew ? 0 : -1);
 
             let html = '';
             if (matches.length > 0) {
                 html += '<div class="erp-autocomplete-list">';
-                matches.slice(0, 35).forEach((opt, idx) => {
-                    const isSelected = String(selectInput.value || '') === String(opt.value);
-                    if (isParty) {
+                matches.slice(0, 35).forEach((optItem, idx) => {
+                    if (optItem.isSerialMatch) {
+                        const opt = optItem.option;
+                        const isSelected = String(selectInput.value || '') === String(opt.value);
+                        const prod = productsCatalog[opt.value] || null;
+                        const price = isPurchaseEntry ? (prod?.cost_price || opt.costPrice || 0) : (prod?.unit_price || opt.unitPrice || 0);
+                        html += `
+                            <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}" style="background-color: #f0fdf4;">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <div class="text-truncate">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <span class="badge bg-primary text-white font-monospace" style="font-size: 0.74rem;">
+                                                <i class="fas fa-barcode me-1"></i>S/N: ${escapeHtml(optItem.serial)}
+                                            </span>
+                                            <strong class="text-dark text-truncate">${escapeHtml(opt.label)}</strong>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 mt-0.5 text-success small" style="font-size: 0.72rem;">
+                                            <i class="fas fa-check-circle"></i> In-Stock Serialized Unit &bull; Instant Match
+                                        </div>
+                                    </div>
+                                    <div class="text-end flex-shrink-0">
+                                        <div class="fw-bold font-monospace ${isPurchaseEntry ? 'text-primary' : 'text-success'}">₹ ${Number(price).toFixed(2)}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">${isPurchaseEntry ? 'Cost' : 'Sales'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    } else if (isParty) {
+                        const opt = optItem;
+                        const isSelected = String(selectInput.value || '') === String(opt.value);
                         const bal = (partyBalances[opt.value] !== undefined) ? Number(partyBalances[opt.value]) : (opt.balance || 0);
                         const balBadge = bal > 0
                             ? `<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">${entryType === 'purchase' ? 'Payable: ' : 'Due: '}₹ ${bal.toFixed(2)}</span>`
@@ -2178,6 +2228,8 @@ function initInventoryEntryDashboard() {
                             </div>
                         `;
                     } else {
+                        const opt = optItem;
+                        const isSelected = String(selectInput.value || '') === String(opt.value);
                         const prod = productsCatalog[opt.value] || null;
                         const price = isPurchaseEntry ? (prod?.cost_price || opt.costPrice || 0) : (prod?.unit_price || opt.unitPrice || 0);
                         const stock = prod ? Number(prod.stock_quantity || 0) : (opt.stock || 0);
@@ -2193,6 +2245,7 @@ function initInventoryEntryDashboard() {
                                         <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.74rem;">
                                             ${opt.sku ? `<span class="font-monospace text-secondary"><i class="fas fa-barcode me-1 text-muted"></i>${escapeHtml(opt.sku)}</span>` : ''}
                                             ${stockBadge}
+                                            ${prod?.has_serial_tracking ? '<span class="badge bg-info-subtle text-info border"><i class="fas fa-barcode me-1"></i>Serialized</span>' : ''}
                                             ${prod?.category ? `<span class="badge bg-light text-secondary border">${escapeHtml(prod.category)}</span>` : ''}
                                             ${prod?.bin_location ? `<span class="text-muted"><i class="fas fa-location-dot text-danger me-1"></i>${escapeHtml(prod.bin_location)}</span>` : ''}
                                         </div>
@@ -2215,7 +2268,7 @@ function initInventoryEntryDashboard() {
                 `;
             }
 
-            if (extraOptions.onAddNew && !hasExactMatch) {
+            if (extraOptions.onAddNew && !hasExactMatch && serialMatches.length === 0) {
                 const queryLabel = rawQuery ? `"${escapeHtml(rawQuery)}"` : `New ${entityName}`;
                 html += `
                     <div class="erp-autocomplete-footer">
@@ -2234,6 +2287,14 @@ function initInventoryEntryDashboard() {
 
         function selectOption(optionData) {
             if (!optionData) return;
+            if (optionData.isSerialMatch && extraOptions.row) {
+                const prod = productsCatalog[String(optionData.value)];
+                if (prod) {
+                    hideDropdown();
+                    applySerialToRow(prod, optionData.serial, extraOptions.row);
+                    return;
+                }
+            }
             setSelectedValueInternal(optionData.value, true);
             pickerInput.value = optionData.label;
             hideDropdown();
@@ -2303,6 +2364,18 @@ function initInventoryEntryDashboard() {
             if (!query) {
                 setSelectedValueInternal('', true);
                 return;
+            }
+            // 0. Serial-First Exact Match on Serial Number (Sales & Billing)
+            if (!isParty && typeof availableSerialsByNumber !== 'undefined') {
+                const serialUpper = rawText.trim().toUpperCase();
+                if (availableSerialsByNumber[serialUpper]) {
+                    const sInfo = availableSerialsByNumber[serialUpper];
+                    const matchedProd = productsCatalog[String(sInfo.product_id)];
+                    if (matchedProd && extraOptions.row) {
+                        applySerialToRow(matchedProd, sInfo.serial_number, extraOptions.row);
+                        return;
+                    }
+                }
             }
             // 1. Exact match on SKU (barcode gun scan)
             const exactSkuMatch = allOptions.find((option) => option.sku && normalizeText(option.sku) === query);
@@ -2419,6 +2492,17 @@ function initInventoryEntryDashboard() {
                         selectOption(currentMatches[0]);
                     } else {
                         hideDropdown();
+                    }
+                } else if (!isParty && typeof availableSerialsByNumber !== 'undefined') {
+                    const serialUpper = (pickerInput.value || '').trim().toUpperCase();
+                    if (availableSerialsByNumber[serialUpper]) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        const sInfo = availableSerialsByNumber[serialUpper];
+                        const matchedProd = productsCatalog[String(sInfo.product_id)];
+                        if (matchedProd && extraOptions.row) {
+                            applySerialToRow(matchedProd, sInfo.serial_number, extraOptions.row);
+                        }
                     }
                 }
             } else if (event.key === 'Escape') {
@@ -3148,23 +3232,50 @@ function initInventoryEntryDashboard() {
                     serialCountBadge.className = 'input-group-text bg-light text-muted border-start-0 py-0 px-2 line-serials-count';
                 }
             }
+            if (entryType === 'sale' && typeof availableSerials !== 'undefined' && availableSerials[prodId]) {
+                let datalist = row.querySelector('.line-serials-datalist');
+                if (!datalist) {
+                    const listId = 'serials-list-' + Math.random().toString(36).substr(2, 9);
+                    datalist = document.createElement('datalist');
+                    datalist.className = 'line-serials-datalist';
+                    datalist.id = listId;
+                    row.appendChild(datalist);
+                    if (serialInput) serialInput.setAttribute('list', listId);
+                }
+                const enteredUpper = enteredSerials.map((s) => s.toUpperCase());
+                datalist.innerHTML = (availableSerials[prodId] || [])
+                    .filter((sn) => !enteredUpper.includes(sn.toUpperCase()))
+                    .map((sn) => `<option value="${escapeHtml(sn)}"></option>`)
+                    .join('');
+            }
         } else {
             serialContainer.classList.add('d-none');
             if (serialInput) serialInput.value = '';
         }
     }
 
-    function applySerialToRow(product, serialNumber) {
+    function applySerialToRow(product, serialNumber, preferRow = null) {
         if (!product || !serialNumber || !lineBody) return;
         const prodId = String(product.id);
         const existingRows = Array.from(lineBody.querySelectorAll('.inventory-line-row'));
 
-        let targetRow = existingRows.find((r) => {
-            const sel = r.querySelector('.inventory-line-product');
-            return sel && String(sel.value || '') === prodId;
-        });
+        let targetRow = null;
+        if (preferRow && existingRows.includes(preferRow)) {
+            const sel = preferRow.querySelector('.inventory-line-product');
+            const curVal = String(sel?.value || '').trim();
+            if (!curVal || curVal === prodId) {
+                targetRow = preferRow;
+            }
+        }
 
-        if (targetRow) {
+        if (!targetRow) {
+            targetRow = existingRows.find((r) => {
+                const sel = r.querySelector('.inventory-line-product');
+                return sel && String(sel.value || '') === prodId;
+            });
+        }
+
+        if (targetRow && String(targetRow.querySelector('.inventory-line-product')?.value || '') === prodId) {
             const serialInput = targetRow.querySelector('.line-serials-input');
             const qtyInput = targetRow.querySelector('input[name="line_quantity[]"]');
             if (serialInput) {
@@ -4527,13 +4638,14 @@ function initInventoryEntryDashboard() {
                     barcodeBuffer = '';
 
                     const serialUpper = scanned.toUpperCase();
-                    if (availableSerials && availableSerials[serialUpper]) {
-                        const sInfo = availableSerials[serialUpper];
+                    if (typeof availableSerialsByNumber !== 'undefined' && availableSerialsByNumber[serialUpper]) {
+                        const sInfo = availableSerialsByNumber[serialUpper];
                         const matchedProd = productsCatalog[String(sInfo.product_id)];
                         if (matchedProd) {
                             event.preventDefault();
                             event.stopPropagation();
-                            applySerialToRow(matchedProd, sInfo.serial_number);
+                            const activeRow = document.activeElement ? document.activeElement.closest('.inventory-line-row') : null;
+                            applySerialToRow(matchedProd, sInfo.serial_number, activeRow);
                             return;
                         }
                     }

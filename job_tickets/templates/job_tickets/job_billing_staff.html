@@ -614,6 +614,23 @@
                                 <small class="text-muted">
                                     {% if sale.product.sku %}SKU: {{ sale.product.sku }} &bull; {% endif %}Stock: {{ sale.product.stock_quantity }}
                                 </small>
+                                {% for cs in consumed_serials %}
+                                    {% if cs.product_id == sale.product_id and cs.sale_entry_id == sale.inventory_entry_id %}
+                                        <div class="mt-1">
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.73rem;">
+                                                <i class="fas fa-barcode me-1"></i>S/N: {{ cs.serial_number }}
+                                                {% if cs.customer_warranty_until %}&bull; Warranty to {{ cs.customer_warranty_until|date:"d M Y" }}{% endif %}
+                                            </span>
+                                        </div>
+                                    {% elif cs.product_id == sale.product_id and not cs.sale_entry_id %}
+                                        <div class="mt-1">
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.73rem;">
+                                                <i class="fas fa-barcode me-1"></i>S/N: {{ cs.serial_number }}
+                                                {% if cs.customer_warranty_until %}&bull; Warranty to {{ cs.customer_warranty_until|date:"d M Y" }}{% endif %}
+                                            </span>
+                                        </div>
+                                    {% endif %}
+                                {% endfor %}
                             </div>
                         </div>
                     </td>
@@ -778,7 +795,8 @@
                                 data-stock="{{ product.stock_quantity }}"
                                 data-sku="{{ product.sku|default:'' }}"
                                 data-category="{{ product.category|default:'' }}"
-                                data-brand="{{ product.brand|default:'' }}">
+                                data-brand="{{ product.brand|default:'' }}"
+                                data-has-serial="{{ product.has_serial_tracking|yesno:'1,0' }}">
                             {{ product.name }} (Stock: {{ product.stock_quantity }})
                         </option>
                     {% endfor %}
@@ -786,6 +804,16 @@
                 <div class="product-meta-hint small text-muted mt-1" style="font-size: 0.75rem;">
                     <span class="product-sku-hint"></span>
                     <span class="product-stock-hint badge bg-light text-secondary border">Stock: --</span>
+                </div>
+                <div class="product-serial-container mt-1" style="display: none;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-white text-muted py-0 px-2" style="font-size: 0.73rem;">
+                            <i class="fas fa-barcode me-1 text-primary"></i> S/N:
+                        </span>
+                        <select name="product_serial[]" class="form-select form-select-sm product-serial-select editable-product-field py-0" style="font-size: 0.75rem; background-color: #fffbe6;">
+                            <option value="">-- Choose In-Stock Serial / IMEI --</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </td>
@@ -1061,6 +1089,9 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    const availableSerials = {{ available_serials_json|safe|default:"{}" }};
+    const availableSerialsByNumber = {{ available_serials_by_number_json|safe|default:"{}" }};
+
     // ----------------------------------------------------
     // 1. Dynamic Settlement Modal Handler
     // ----------------------------------------------------
@@ -1461,6 +1492,45 @@ document.addEventListener('DOMContentLoaded', function() {
             stockHint.textContent = `Stock: ${stock}`;
         }
 
+        // Serial selection container
+        const serialContainer = row.querySelector('.product-serial-container');
+        const serialSelect = row.querySelector('.product-serial-select');
+        const hasSerial = selectedOption.dataset.hasSerial === '1';
+
+        if (serialContainer && serialSelect) {
+            if (hasSerial) {
+                serialContainer.style.display = 'block';
+                const prodId = String(select.value);
+                const availableForProd = (typeof availableSerials !== 'undefined' && availableSerials[prodId]) ? availableSerials[prodId] : [];
+                const currentVal = serialSelect.value || row._preselectedSerial || '';
+                
+                let optsHtml = '<option value="">-- Choose In-Stock Serial / IMEI --</option>';
+                availableForProd.forEach(sn => {
+                    const isSel = (sn === currentVal) ? 'selected' : '';
+                    optsHtml += `<option value="${escapeHtml(sn)}" ${isSel}>${escapeHtml(sn)}</option>`;
+                });
+                if (currentVal && !availableForProd.includes(currentVal)) {
+                    optsHtml += `<option value="${escapeHtml(currentVal)}" selected>${escapeHtml(currentVal)}</option>`;
+                }
+                serialSelect.innerHTML = optsHtml;
+                delete row._preselectedSerial;
+
+                if (qtyInput) {
+                    qtyInput.value = '1';
+                    qtyInput.readOnly = true;
+                    qtyInput.title = 'Serialized items are tracked per single unit (Quantity: 1)';
+                    qty = 1;
+                }
+            } else {
+                serialContainer.style.display = 'none';
+                serialSelect.innerHTML = '<option value="">-- Choose In-Stock Serial / IMEI --</option>';
+                if (qtyInput) {
+                    qtyInput.readOnly = false;
+                    qtyInput.title = '';
+                }
+            }
+        }
+
         // Line total
         const lineTotal = sellingPrice * qty;
         if (lineTotalDisplay) {
@@ -1834,6 +1904,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         price: parseFloat(opt.dataset.price || 0),
                         category: opt.dataset.category || '',
                         brand: opt.dataset.brand || '',
+                        hasSerial: opt.dataset.hasSerial === '1',
                         disabled: opt.disabled,
                     });
                 });
@@ -1850,7 +1921,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
             hasExactMatch = Boolean(query && allOptions.some((opt) => normalizeStr(opt.label) === query || (opt.sku && normalizeStr(opt.sku) === query)));
 
-            const matches = allOptions.filter((opt) => {
+            // Serial-First Search & Barcode Scan: Search in-stock serial numbers
+            const serialMatches = [];
+            if (rawQuery && typeof availableSerialsByNumber !== 'undefined') {
+                const queryUpper = rawQuery.toUpperCase();
+                Object.keys(availableSerialsByNumber).forEach((key) => {
+                    if (key === queryUpper || key.includes(queryUpper)) {
+                        const sInfo = availableSerialsByNumber[key];
+                        const opt = allOptions.find((o) => String(o.value) === String(sInfo.product_id));
+                        if (opt) {
+                            serialMatches.push({
+                                isSerialMatch: true,
+                                serial: sInfo.serial_number,
+                                option: opt,
+                                label: `${opt.label} [S/N: ${sInfo.serial_number}]`,
+                                value: opt.value,
+                            });
+                        }
+                    }
+                });
+            }
+
+            const standardMatches = allOptions.filter((opt) => {
                 if (!query) return true;
                 const labelMatch = normalizeStr(opt.label).includes(query);
                 const skuMatch = opt.sku && normalizeStr(opt.sku).includes(query);
@@ -1858,38 +1950,67 @@ document.addEventListener('DOMContentLoaded', function() {
                 return labelMatch || skuMatch || catMatch;
             });
 
+            const matches = [...serialMatches, ...standardMatches];
             currentMatches = matches;
-            const canAddNew = !hasExactMatch;
+            const canAddNew = !hasExactMatch && serialMatches.length === 0;
             highlightedIndex = matches.length > 0 ? 0 : (canAddNew ? 0 : -1);
 
             let html = '';
             if (matches.length > 0) {
                 html += '<div class="erp-autocomplete-list">';
-                matches.slice(0, 30).forEach((opt, idx) => {
-                    const isSelected = String(selectInput.value || '') === String(opt.value);
-                    const stock = opt.stock || 0;
-                    const stockBadge = stock > 0
-                        ? `<span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">${stock} in stock</span>`
-                        : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">0 in stock</span>`;
-
-                    html += `
-                        <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}">
-                            <div class="d-flex align-items-center justify-content-between gap-2">
-                                <div class="text-truncate">
-                                    <div class="fw-semibold text-dark text-truncate">${escapeHtml(opt.label)}</div>
-                                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.74rem;">
-                                        ${opt.sku ? `<span class="font-monospace text-secondary"><i class="fas fa-barcode me-1 text-muted"></i>${escapeHtml(opt.sku)}</span>` : ''}
-                                        ${stockBadge}
-                                        ${opt.category ? `<span class="badge bg-light text-secondary border">${escapeHtml(opt.category)}</span>` : ''}
+                matches.slice(0, 35).forEach((optItem, idx) => {
+                    if (optItem.isSerialMatch) {
+                        const opt = optItem.option;
+                        const isSelected = String(selectInput.value || '') === String(opt.value);
+                        html += `
+                            <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}" style="background-color: #f0fdf4;">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <div class="text-truncate">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <span class="badge bg-primary text-white font-monospace" style="font-size: 0.74rem;">
+                                                <i class="fas fa-barcode me-1"></i>S/N: ${escapeHtml(optItem.serial)}
+                                            </span>
+                                            <strong class="text-dark text-truncate">${escapeHtml(opt.label)}</strong>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 mt-0.5 text-success small" style="font-size: 0.72rem;">
+                                            <i class="fas fa-check-circle"></i> In-Stock Serialized Unit &bull; Instant Match
+                                        </div>
+                                    </div>
+                                    <div class="text-end flex-shrink-0">
+                                        <div class="fw-bold font-monospace text-success">₹ ${Number(opt.price).toFixed(2)}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Selling</div>
                                     </div>
                                 </div>
-                                <div class="text-end flex-shrink-0">
-                                    <div class="fw-bold font-monospace text-success">₹ ${Number(opt.price).toFixed(2)}</div>
-                                    <div class="text-muted" style="font-size: 0.7rem;">Selling</div>
+                            </div>
+                        `;
+                    } else {
+                        const opt = optItem;
+                        const isSelected = String(selectInput.value || '') === String(opt.value);
+                        const stock = opt.stock || 0;
+                        const stockBadge = stock > 0
+                            ? `<span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">${stock} in stock</span>`
+                            : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">0 in stock</span>`;
+
+                        html += `
+                            <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <div class="text-truncate">
+                                        <div class="fw-semibold text-dark text-truncate">${escapeHtml(opt.label)}</div>
+                                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.74rem;">
+                                            ${opt.sku ? `<span class="font-monospace text-secondary"><i class="fas fa-barcode me-1 text-muted"></i>${escapeHtml(opt.sku)}</span>` : ''}
+                                            ${stockBadge}
+                                            ${opt.hasSerial ? '<span class="badge bg-info-subtle text-info border"><i class="fas fa-barcode me-1"></i>Serialized</span>' : ''}
+                                            ${opt.category ? `<span class="badge bg-light text-secondary border">${escapeHtml(opt.category)}</span>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="text-end flex-shrink-0">
+                                        <div class="fw-bold font-monospace text-success">₹ ${Number(opt.price).toFixed(2)}</div>
+                                        <div class="text-muted" style="font-size: 0.7rem;">Selling</div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    }
                 });
                 html += '</div>';
             } else {
@@ -1917,16 +2038,34 @@ document.addEventListener('DOMContentLoaded', function() {
             return matches;
         }
 
-        function selectOption(optionData) {
+        function selectOption(optionData, specificSerial = '') {
             if (!optionData) return;
-            selectInput.value = optionData.value;
-            pickerInput.value = optionData.label;
+            const opt = optionData.option || optionData;
+            const serialNumber = optionData.serial || specificSerial || '';
+
+            if (serialNumber) {
+                rowNode._preselectedSerial = serialNumber;
+            }
+
+            selectInput.value = opt.value;
+            pickerInput.value = opt.label;
             hideDropdown();
             selectInput.dispatchEvent(new Event('change', { bubbles: true }));
 
-            // Smooth focus to quantity input
+            if (serialNumber) {
+                const serialSelect = rowNode.querySelector('.product-serial-select');
+                if (serialSelect) {
+                    serialSelect.value = serialNumber;
+                }
+            }
+
+            // Smooth focus to price or qty input
+            const unitPriceInput = rowNode.querySelector('.product-unit-price-input');
             const qtyInput = rowNode.querySelector('.product-qty');
-            if (qtyInput) {
+            if (opt.hasSerial && unitPriceInput) {
+                unitPriceInput.focus();
+                unitPriceInput.select();
+            } else if (qtyInput) {
                 qtyInput.focus();
                 qtyInput.select();
             }
@@ -1960,6 +2099,20 @@ document.addEventListener('DOMContentLoaded', function() {
                 selectInput.dispatchEvent(new Event('change', { bubbles: true }));
                 return;
             }
+
+            // 0. Exact match on Serial Number / IMEI (Barcode gun scan of serial or IMEI)
+            if (rawText && typeof availableSerialsByNumber !== 'undefined') {
+                const queryUpper = rawText.trim().toUpperCase();
+                if (availableSerialsByNumber[queryUpper]) {
+                    const sInfo = availableSerialsByNumber[queryUpper];
+                    const exactProdMatch = allOptions.find((opt) => String(opt.value) === String(sInfo.product_id));
+                    if (exactProdMatch) {
+                        selectOption(exactProdMatch, sInfo.serial_number);
+                        return;
+                    }
+                }
+            }
+
             // 1. Exact match on SKU (barcode gun scan)
             const exactSkuMatch = allOptions.find((opt) => opt.sku && normalizeStr(opt.sku) === query);
             if (exactSkuMatch) {

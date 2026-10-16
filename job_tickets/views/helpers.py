@@ -6543,12 +6543,19 @@ def _inventory_entry_dashboard(request, entry_type):
         status=ProductItemSerial.STATUS_IN_STOCK,
     ).values('product_id', 'serial_number')
     available_serials_map = {}
+    available_serials_by_number = {}
     for s in in_stock_serials:
         pid_str = str(s['product_id'])
+        sn = s['serial_number']
         if pid_str not in available_serials_map:
             available_serials_map[pid_str] = []
-        available_serials_map[pid_str].append(s['serial_number'])
+        available_serials_map[pid_str].append(sn)
+        available_serials_by_number[sn.strip().upper()] = {
+            'product_id': s['product_id'],
+            'serial_number': sn,
+        }
     available_serials_json = json.dumps(available_serials_map)
+    available_serials_by_number_json = json.dumps(available_serials_by_number)
 
     just_recorded_bill_data = None
     just_bill_id = request.GET.get('just_recorded_bill')
@@ -6657,6 +6664,7 @@ def _inventory_entry_dashboard(request, entry_type):
         'party_balances_json': party_balances_json,
         'products_catalog_json': products_catalog_json,
         'available_serials_json': available_serials_json,
+        'available_serials_by_number_json': available_serials_by_number_json,
         'just_recorded_bill_data': just_recorded_bill_data,
         'financial_accounts': scope_to_workspace(
             FinancialAccount.objects.filter(is_active=True),
