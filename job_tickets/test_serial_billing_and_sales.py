@@ -366,6 +366,12 @@ class SerialBillingAndSalesTestCase(TestCase):
         self.assertIn('Alice Customer', html)
         self.assertIn('PAID', html)
 
+        # 6. Verify Terms & Conditions and Customer Signature are omitted
+        self.assertNotIn('Terms &amp; Conditions', html)
+        self.assertNotIn('Customer Signature', html)
+        self.assertIn('Authorized Signatory', html)
+        self.assertIn('For Botgi Tech Hub', html)
+
     def test_technician_product_and_serial_selection(self):
         # Create technician user
         tech_group, _ = Group.objects.get_or_create(name='Technicians')
