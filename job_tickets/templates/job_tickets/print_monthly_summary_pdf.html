@@ -204,10 +204,23 @@
                 </tr>
                 {% endfor %}
                 <tr>
-                    <th colspan="2">Total Closed Jobs</th>
+                    <td>Operating Expenses</td>
+                    <td>Shop overheads (Rent, utilities, maintenance)</td>
+                    <td class="text-end">&mdash;</td>
+                    <td class="text-end">&#8377;{{ period_overhead_expenses|default:"0.00"|floatformat:2 }}</td>
+                    <td class="text-end">{% if period_overhead_expenses > 0 %}- &#8377;{{ period_overhead_expenses|floatformat:2 }}{% else %}&#8377;0.00{% endif %}</td>
+                </tr>
+                <tr>
+                    <th colspan="2">Total Direct Performance</th>
                     <th class="text-end">&#8377;{{ overall_revenue|floatformat:2 }}</th>
                     <th class="text-end">{% if overall_expense %}&#8377;{{ overall_expense|floatformat:2 }}{% else %}&mdash;{% endif %}</th>
                     <th class="text-end">&#8377;{{ overall_profit|floatformat:2 }}</th>
+                </tr>
+                <tr>
+                    <th colspan="2">True Net Operating Profit</th>
+                    <th class="text-end">&#8377;{{ overall_revenue|floatformat:2 }}</th>
+                    <th class="text-end">&#8377;{{ period_total_expenses|default:overall_expense|floatformat:2 }}</th>
+                    <th class="text-end">&#8377;{{ period_net_profit|floatformat:2 }}</th>
                 </tr>
             </tbody>
         </table>
