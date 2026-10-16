@@ -1988,18 +1988,18 @@ document.addEventListener('DOMContentLoaded', function() {
                         const isSelected = String(selectInput.value || '') === String(opt.value);
                         const stock = opt.stock || 0;
                         const stockBadge = stock > 0
-                            ? `<span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">${stock} in stock</span>`
-                            : `<span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">0 in stock</span>`;
+                            ? `<span class="fw-semibold text-success font-monospace">${stock} in stock</span>`
+                            : `<span class="fw-semibold text-danger font-monospace">0 in stock</span>`;
 
                         html += `
                             <div class="erp-autocomplete-item ${idx === 0 ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-index="${idx}">
                                 <div class="d-flex align-items-center justify-content-between gap-2">
                                     <div class="text-truncate">
                                         <div class="fw-semibold text-dark text-truncate">${escapeHtml(opt.label)}</div>
-                                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.74rem;">
+                                        <div class="d-flex align-items-center gap-2 mt-1 flex-wrap text-truncate" style="font-size: 0.78rem;">
                                             ${opt.sku ? `<span class="font-monospace text-secondary"><i class="fas fa-barcode me-1 text-muted"></i>${escapeHtml(opt.sku)}</span>` : ''}
                                             ${stockBadge}
-                                            ${opt.hasSerial ? '<span class="badge bg-info-subtle text-info border"><i class="fas fa-barcode me-1"></i>Serialized</span>' : ''}
+                                            ${opt.hasSerial ? '<span class="fw-semibold" style="color: #0284c7;"><i class="fas fa-barcode me-1"></i>Serialized</span>' : ''}
                                             ${opt.category ? `<span class="badge bg-light text-secondary border">${escapeHtml(opt.category)}</span>` : ''}
                                         </div>
                                     </div>
