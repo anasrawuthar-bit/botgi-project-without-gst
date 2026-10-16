@@ -390,19 +390,13 @@
                         </tbody>
                         <tfoot class="table-light fw-bold border-top border-2">
                             <tr>
-                                <th scope="row" class="ps-3">Total Direct Performance</th>
-                                <td class="text-end text-dark">&#8377;{{ financial_summary.overall_revenue|floatformat:2 }}</td>
-                                <td class="text-end text-muted">{% if financial_summary.overall_expense %}&#8377;{{ financial_summary.overall_expense|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
-                                <td class="text-end pe-3 text-dark">&#8377;{{ financial_summary.overall_profit|floatformat:2 }}</td>
-                            </tr>
-                            <tr class="table-success">
-                                <th scope="row" class="ps-3 text-success">
-                                    True Net Operating Profit
-                                    <span class="badge bg-success ms-1" style="font-size: 0.72rem;">{{ financial_summary.overall_margin|floatformat:1 }}%</span>
+                                <th scope="row" class="ps-3">
+                                    Totals
+                                    <span class="badge bg-success ms-1" style="font-size: 0.72rem;">{{ financial_summary.overall_margin|floatformat:1 }}% Margin</span>
                                 </th>
-                                <td class="text-end text-success">&#8377;{{ financial_summary.overall_revenue|floatformat:2 }}</td>
+                                <td class="text-end text-dark">&#8377;{{ financial_summary.overall_revenue|floatformat:2 }}</td>
                                 <td class="text-end text-danger">&#8377;{{ financial_summary.period_total_expenses|default:financial_summary.overall_expense|floatformat:2 }}</td>
-                                <td class="text-end pe-3 fs-6 text-success">&#8377;{{ financial_summary.period_net_profit|floatformat:2 }}</td>
+                                <td class="text-end pe-3 fs-6 {% if financial_summary.period_net_profit >= 0 %}text-success{% else %}text-danger{% endif %}">&#8377;{{ financial_summary.period_net_profit|floatformat:2 }}</td>
                             </tr>
                         </tfoot>
                     </table>

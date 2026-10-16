@@ -625,18 +625,12 @@
                     </tr>
                 </tbody>
                 <tfoot>
-                    <tr class="fw-semibold table-light border-top border-2">
-                        <td colspan="2">Total Direct Performance ({{ jobs_closed_count }} Closed Jobs{% if direct_stock_sales_count %} + {{ direct_stock_sales_count }} Retail Sales{% endif %})</td>
-                        <td class="text-end text-dark">&#8377;{{ overall_revenue|floatformat:2 }}</td>
-                        <td class="text-end text-muted">{% if overall_expense %}&#8377;{{ overall_expense|floatformat:2 }}{% else %}&mdash;{% endif %}</td>
-                        <td class="text-end text-dark">&#8377;{{ overall_profit|floatformat:2 }}</td>
-                    </tr>
-                    <tr class="fw-bold table-success">
+                    <tr class="fw-bold table-light border-top border-2">
                         <td colspan="2">
-                            True Net Operating Profit
+                            Totals ({{ jobs_closed_count }} Closed Jobs{% if direct_stock_sales_count %} + {{ direct_stock_sales_count }} Retail Sales{% endif %})
                             <span class="badge bg-success ms-1" style="font-size: 0.72rem;">{{ overall_margin|floatformat:1 }}% Margin</span>
                         </td>
-                        <td class="text-end">&#8377;{{ overall_revenue|floatformat:2 }}</td>
+                        <td class="text-end text-dark">&#8377;{{ overall_revenue|floatformat:2 }}</td>
                         <td class="text-end text-danger">&#8377;{{ period_total_expenses|default:overall_expense|floatformat:2 }}</td>
                         <td class="text-end text-success fs-6">&#8377;{{ period_net_profit|floatformat:2 }}</td>
                     </tr>
