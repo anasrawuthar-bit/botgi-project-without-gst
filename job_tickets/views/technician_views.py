@@ -400,13 +400,152 @@ def job_detail_technician(request, job_code):
             if job.status == 'Specialized Service':
                 error_message = 'Cannot add service logs while job is in Specialized Service. Service charges will be automatically added when returned from vendor.'
                 if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-                    return JsonResponse({
-                        'ok': False,
-                        'message': error_message,
-                    }, status=400)
+                    return JsonResponse({'ok': False, 'message': error_message}, status=400)
                 messages.error(request, error_message)
                 return redirect('job_detail_technician', job_code=job_code)
-            
+
+            product_id_raw = (request.POST.get('product_id') or '').strip()
+            if product_id_raw:
+                try:
+                    product = get_object_or_404(
+                        Product,
+                        pk=int(product_id_raw),
+                        workspace=job.workspace,
+                    )
+                except (ValueError, Http404):
+                    error_message = 'Selected product was not found in inventory.'
+                    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                        return JsonResponse({'ok': False, 'message': error_message}, status=400)
+                    messages.error(request, error_message)
+                    return redirect('job_detail_technician', job_code=job_code)
+
+                try:
+                    qty = int(request.POST.get('quantity') or 1)
+                    if qty <= 0:
+                        qty = 1
+                except (ValueError, TypeError):
+                    qty = 1
+
+                if product.stock_quantity < qty:
+                    error_message = f"Insufficient stock for '{product.name}'. Available: {product.stock_quantity}."
+                    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                        return JsonResponse({'ok': False, 'message': error_message}, status=400)
+                    messages.error(request, error_message)
+                    return redirect('job_detail_technician', job_code=job_code)
+
+                raw_serial = (request.POST.get('product_serial') or '').strip()
+                item_serial = None
+                if product.has_serial_tracking:
+                    if not raw_serial:
+                        error_message = f"A serial number is required for serialized product '{product.name}'."
+                        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                            return JsonResponse({'ok': False, 'message': error_message}, status=400)
+                        messages.error(request, error_message)
+                        return redirect('job_detail_technician', job_code=job_code)
+
+                    item_serial = ProductItemSerial.objects.filter(
+                        workspace=job.workspace,
+                        product=product,
+                        serial_number__iexact=raw_serial,
+                    ).first()
+                    if not item_serial or (item_serial.status != ProductItemSerial.STATUS_IN_STOCK and item_serial.job_ticket_id != job.id):
+                        error_message = f"Serial number '{raw_serial}' is no longer available in stock."
+                        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                            return JsonResponse({'ok': False, 'message': error_message}, status=400)
+                        messages.error(request, error_message)
+                        return redirect('job_detail_technician', job_code=job_code)
+
+                try:
+                    part_cost_input = Decimal(request.POST.get('part_cost') or '0')
+                    if part_cost_input < Decimal('0.00'):
+                        part_cost_input = Decimal('0.00')
+                except (InvalidOperation, ValueError, TypeError):
+                    part_cost_input = (product.unit_price or Decimal('0.00')) * qty
+
+                try:
+                    service_charge_input = Decimal(request.POST.get('service_charge') or '0')
+                    if service_charge_input < Decimal('0.00'):
+                        service_charge_input = Decimal('0.00')
+                except (InvalidOperation, ValueError, TypeError):
+                    service_charge_input = Decimal('0.00')
+
+                desc = (request.POST.get('description') or '').strip() or f"Part: {product.name}"
+
+                with transaction.atomic():
+                    new_service = ServiceLog.objects.create(
+                        job_ticket=job,
+                        description=desc,
+                        part_cost=part_cost_input,
+                        service_charge=service_charge_input,
+                    )
+
+                    unit_price = (part_cost_input / qty) if qty > 0 else (product.unit_price or Decimal('0.00'))
+                    line_cost = (product.cost_price or Decimal('0.00')) * qty
+                    line_total = part_cost_input + service_charge_input
+                    line_profit = line_total - line_cost
+
+                    ProductSale.objects.create(
+                        workspace=job.workspace,
+                        job_ticket=job,
+                        product=product,
+                        service_log=new_service,
+                        quantity=qty,
+                        unit_price=unit_price,
+                        cost_price=product.cost_price or Decimal('0.00'),
+                        line_total=line_total,
+                        line_cost=line_cost,
+                        line_profit=line_profit,
+                        sold_by=request.user,
+                    )
+
+                    product.stock_quantity = max(0, product.stock_quantity - qty)
+                    product.save(update_fields=['stock_quantity', 'updated_at'])
+
+                    if item_serial:
+                        customer_warranty_until = None
+                        if product.customer_warranty_months > 0:
+                            from dateutil.relativedelta import relativedelta
+                            customer_warranty_until = timezone.localdate() + relativedelta(months=product.customer_warranty_months)
+
+                        item_serial.status = ProductItemSerial.STATUS_CONSUMED_IN_JOB
+                        item_serial.job_ticket = job
+                        item_serial.sale_price = unit_price
+                        item_serial.customer_warranty_until = customer_warranty_until
+                        item_serial.save(update_fields=[
+                            'status', 'job_ticket', 'sale_price', 'customer_warranty_until', 'updated_at'
+                        ])
+
+                    sn_text = f" (S/N: {raw_serial})" if raw_serial else ""
+                    details = f"Technician added product: {product.name} x{qty} at Rs {unit_price}{sn_text} (Part: Rs {part_cost_input}, Labor: Rs {service_charge_input})."
+                    JobTicketLog.objects.create(job_ticket=job, user=request.user, action='SERVICE', details=details)
+
+                # Send WebSocket update
+                send_job_update_message(job.job_code, job.status)
+
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                    service_logs = job.service_logs.all()
+                    calculate_job_totals([job])
+                    html = render_to_string('job_tickets/_service_logs_table.html', {
+                        'job': job,
+                        'service_logs': service_logs,
+                        'total_parts_cost': job.part_total,
+                        'total_service_charges': job.service_total,
+                        'grand_total': job.total,
+                    }, request=request)
+                    return JsonResponse({
+                        'ok': True,
+                        'message': f"Product '{product.name}' added successfully.",
+                        'html': html,
+                        'total_parts_cost': f"{job.part_total:.2f}",
+                        'total_service_charges': f"{job.service_total:.2f}",
+                        'grand_total': f"{job.total:.2f}",
+                        'item_count': service_logs.count(),
+                    })
+
+                messages.success(request, f"Product '{product.name}' added successfully.")
+                return redirect('job_detail_technician', job_code=job_code)
+
+            # Custom service entry
             service_form = ServiceLogForm(request.POST)
             if service_form.is_valid():
                 new_service = service_form.save(commit=False)
@@ -440,7 +579,6 @@ def job_detail_technician(request, job_code):
                         'item_count': service_logs.count(),
                     })
 
-                
                 messages.success(request, 'Service log added.')
                 return redirect('job_detail_technician', job_code=job_code)
             else:
@@ -645,11 +783,52 @@ def job_detail_technician(request, job_code):
         else:
             delivery_status = 'upcoming'
 
+    products_qs = Product.objects.filter(is_active=True)
+    if job.workspace:
+        products_qs = products_qs.filter(workspace=job.workspace)
+    products_for_sale = list(products_qs.order_by('name'))
+
+    in_stock_serials = list(ProductItemSerial.objects.filter(
+        workspace=job.workspace,
+        status=ProductItemSerial.STATUS_IN_STOCK,
+    ).values('product_id', 'serial_number'))
+
+    available_serials_map = {}
+    available_serials_by_number = {}
+
+    for s in in_stock_serials:
+        pid_str = str(s['product_id'])
+        sn = s['serial_number']
+        if pid_str not in available_serials_map:
+            available_serials_map[pid_str] = []
+        if sn not in available_serials_map[pid_str]:
+            available_serials_map[pid_str].append(sn)
+        available_serials_by_number[sn.strip().upper()] = {
+            'product_id': s['product_id'],
+            'serial_number': sn,
+        }
+
+    products_catalog = [
+        {
+            'id': p.id,
+            'name': p.name,
+            'sku': p.sku or '',
+            'price': str(p.unit_price or '0.00'),
+            'stock': p.stock_quantity,
+            'has_serial_tracking': bool(p.has_serial_tracking),
+        }
+        for p in products_for_sale
+    ]
+
     context = {
         'job': job,
         'is_closed': is_closed,
         'service_logs': service_logs,
         'service_form': service_form,
+        'products_for_sale': products_for_sale,
+        'products_catalog_json': json.dumps(products_catalog),
+        'available_serials_json': json.dumps(available_serials_map),
+        'available_serials_by_number_json': json.dumps(available_serials_by_number),
         'total_parts_cost': job.part_total,
         'total_service_charges': job.service_total,
         'subtotal': subtotal,
@@ -840,11 +1019,32 @@ def technician_delete_service_log(request, log_id):
     if job.status in ['Ready for Pickup', 'Completed', 'Closed'] or job.vyapar_invoice_number:
         return JsonResponse({'ok': False, 'error': 'editing_not_allowed', 'message': 'Cannot delete logs after billing or completion.'}, status=403)
 
-    # Delete and log
-    details = f"Service log deleted: '{log.description}' (Part: {log.part_cost}, Service: {log.service_charge})"
-    log.delete()
-    JobTicketLog.objects.create(job_ticket=job, user=request.user, action='SERVICE', details=details)
-    calculate_job_totals([job])
+    # Delete and log, restocking product and releasing serial if applicable
+    with transaction.atomic():
+        linked_sales = list(ProductSale.objects.filter(service_log=log).select_related('product'))
+        for sale in linked_sales:
+            prod = sale.product
+            prod.stock_quantity = prod.stock_quantity + sale.quantity
+            prod.save(update_fields=['stock_quantity', 'updated_at'])
+
+            ProductItemSerial.objects.filter(
+                job_ticket=job,
+                product=prod,
+                status=ProductItemSerial.STATUS_CONSUMED_IN_JOB,
+            ).update(
+                status=ProductItemSerial.STATUS_IN_STOCK,
+                job_ticket=None,
+                sale_entry=None,
+                sale_price=Decimal('0.00'),
+                customer_warranty_until=None,
+            )
+
+        details = f"Service log deleted: '{log.description}' (Part: {log.part_cost}, Service: {log.service_charge})"
+        log.delete()
+        JobTicketLog.objects.create(job_ticket=job, user=request.user, action='SERVICE', details=details)
+        calculate_job_totals([job])
+
+    send_job_update_message(job.job_code, job.status)
     return JsonResponse({
         'ok': True,
         'message': 'Service log deleted.',

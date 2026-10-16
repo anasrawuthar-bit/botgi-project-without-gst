@@ -366,3 +366,89 @@ class SerialBillingAndSalesTestCase(TestCase):
         self.assertIn('Alice Customer', html)
         self.assertIn('PAID', html)
 
+    def test_technician_product_and_serial_selection(self):
+        # Create technician user
+        tech_group, _ = Group.objects.get_or_create(name='Technicians')
+        tech_user = User.objects.create_user(
+            username='tech_specialist',
+            email='tech@specialist.test',
+            password='password123',
+        )
+        tech_user.groups.add(tech_group)
+        CompanyUserMembership.objects.create(
+            workspace=self.workspace,
+            user=tech_user,
+            role=CompanyUserMembership.ROLE_TECHNICIAN,
+            is_active=True,
+        )
+        self.technician.user = tech_user
+        self.technician.save()
+        self.job.assigned_to = self.technician
+        self.job.status = 'Repairing'
+        self.job.save()
+
+        # Login as technician
+        self.client.login(username='tech_specialist', password='password123')
+        session = self.client.session
+        session['active_company_workspace_id'] = self.workspace.id
+        session.save()
+
+        url = reverse('job_detail_technician', args=[self.job.job_code])
+
+        # 1. GET request: context must have products_catalog_json and available_serials_by_number_json
+        res_get = self.client.get(url)
+        self.assertEqual(res_get.status_code, 200)
+        self.assertIn('products_catalog_json', res_get.context)
+        self.assertIn('available_serials_by_number_json', res_get.context)
+
+        # 2. POST add_service_log with serialized product
+        initial_stock = self.product.stock_quantity
+        post_data = {
+            'action': 'add_service_log',
+            'product_id': str(self.product.id),
+            'product_serial': 'SN-IP13-DISP-001',
+            'quantity': '1',
+            'description': 'Replaced display assembly',
+            'part_cost': '4500.00',
+            'service_charge': '500.00',
+        }
+        res_post = self.client.post(url, post_data, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(res_post.status_code, 200)
+        data = res_post.json()
+        self.assertTrue(data['ok'])
+
+        # Verify stock decremented
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, initial_stock - 1)
+
+        # Verify serial consumed
+        self.item_serial.refresh_from_db()
+        self.assertEqual(self.item_serial.status, ProductItemSerial.STATUS_CONSUMED_IN_JOB)
+        self.assertEqual(self.item_serial.job_ticket_id, self.job.id)
+        self.assertEqual(self.item_serial.sale_price, Decimal('4500.00'))
+        self.assertIsNotNone(self.item_serial.customer_warranty_until)
+
+        # Verify ProductSale record created
+        sale = ProductSale.objects.filter(job_ticket=self.job, product=self.product).first()
+        self.assertIsNotNone(sale)
+        self.assertEqual(sale.quantity, 1)
+        self.assertEqual(sale.unit_price, Decimal('4500.00'))
+        created_log = sale.service_log
+
+        # 3. Technician deletes the service log
+        del_url = reverse('technician_delete_service_log', args=[created_log.id])
+        res_del = self.client.post(del_url, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(res_del.status_code, 200)
+        del_data = res_del.json()
+        self.assertTrue(del_data['ok'])
+
+        # Verify stock restored
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock_quantity, initial_stock)
+
+        # Verify serial released back to in_stock
+        self.item_serial.refresh_from_db()
+        self.assertEqual(self.item_serial.status, ProductItemSerial.STATUS_IN_STOCK)
+        self.assertIsNone(self.item_serial.job_ticket)
+
+

@@ -21,6 +21,21 @@
                     <td class="text-muted small fw-bold text-center">{{ forloop.counter }}</td>
                     <td>
                         <input type="text" name="description_{{ log.id }}" value="{{ log.description }}" class="form-control form-control-sm" placeholder="Service description" {% if job.status in 'Ready for Pickup,Completed,Closed' or job.vyapar_invoice_number %}disabled{% endif %}>
+                        {% if log.product_sale %}
+                        <div class="mt-1 small d-flex flex-wrap align-items-center gap-1" style="font-size: 11px;">
+                            <span class="badge bg-light text-primary border"><i class="fas fa-box me-1"></i>Part: {{ log.product_sale.product.name }} (Qty: {{ log.product_sale.quantity }})</span>
+                            {% for cs in job.consumed_serials.all %}
+                                {% if cs.product_id == log.product_sale.product_id %}
+                                <span class="badge bg-light text-dark border">
+                                    <i class="fas fa-barcode me-1 text-primary"></i>S/N: <strong class="font-monospace">{{ cs.serial_number }}</strong>
+                                    {% if cs.customer_warranty_until %}
+                                    <span class="text-success ms-1">&bull; Warranty until {{ cs.customer_warranty_until|date:"d M Y" }}</span>
+                                    {% endif %}
+                                </span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
                         <div class="invalid-feedback" data-field="description_{{ log.id }}"></div>
                     </td>
                     <td>

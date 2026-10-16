@@ -568,7 +568,7 @@
                         </div>
                     {% else %}
                         <!-- Quick Add Service / Part Box -->
-                        <div class="p-3 mb-3 rounded border bg-light">
+                        <div class="p-3 mb-3 rounded border bg-light shadow-sm">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="fw-bold small text-uppercase text-muted" style="letter-spacing: .04em;">
                                     <i class="fas fa-plus-circle text-primary me-1"></i> Add Part or Labor Charge
@@ -578,19 +578,82 @@
                                 </span>
                             </div>
 
+                            <!-- Entry Mode Pill Switch: Product vs Custom Service -->
+                            <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Add Mode">
+                                <input type="radio" class="btn-check" name="tech_entry_mode" id="tech_mode_product" value="product" checked autocomplete="off">
+                                <label class="btn btn-outline-primary" for="tech_mode_product">
+                                    <i class="fas fa-box me-1"></i> Inventory Product / Spare Part
+                                </label>
+                                <input type="radio" class="btn-check" name="tech_entry_mode" id="tech_mode_custom" value="custom" autocomplete="off">
+                                <label class="btn btn-outline-primary" for="tech_mode_custom">
+                                    <i class="fas fa-wrench me-1"></i> Custom Labor / Service
+                                </label>
+                            </div>
+
                             <form id="quick-add-service-form">
                                 <input type="hidden" name="action" value="add_service_log">
+
+                                <!-- Product Section (Shown in product mode) -->
+                                <div id="tech_product_section" class="mb-2">
+                                    <!-- Serial-first Scan / Match input -->
+                                    <div class="input-group input-group-sm mb-2">
+                                        <span class="input-group-text bg-white text-primary"><i class="fas fa-barcode"></i></span>
+                                        <input
+                                            type="text"
+                                            class="form-control"
+                                            id="tech_serial_scanner"
+                                            placeholder="Scan or type Serial Number to auto-select product..."
+                                            list="tech_available_serials_datalist"
+                                            autocomplete="off"
+                                        >
+                                        <datalist id="tech_available_serials_datalist"></datalist>
+                                        <button class="btn btn-outline-secondary" type="button" id="tech_clear_serial_btn" title="Clear Serial">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    </div>
+
+                                    <div class="row g-2 mb-2">
+                                        <div class="col-sm-8">
+                                            <label for="tech_product_select" class="form-label small text-muted fw-bold mb-1">Select Product</label>
+                                            <select class="form-select form-select-sm" id="tech_product_select" name="product_id">
+                                                <option value="">-- Choose Product from Inventory --</option>
+                                                {% for p in products_for_sale %}
+                                                <option value="{{ p.id }}" data-price="{{ p.unit_price|default_if_none:'0.00' }}" data-stock="{{ p.stock_quantity }}" data-serialized="{% if p.has_serial_tracking %}1{% else %}0{% endif %}">
+                                                    {{ p.name }} (Stock: {{ p.stock_quantity }}, &#8377;{{ p.unit_price|floatformat:2 }})
+                                                </option>
+                                                {% endfor %}
+                                            </select>
+                                        </div>
+                                        <div class="col-sm-4">
+                                            <label for="tech_product_qty" class="form-label small text-muted fw-bold mb-1">Quantity</label>
+                                            <input type="number" min="1" value="1" class="form-control form-control-sm text-center" id="tech_product_qty" name="quantity">
+                                        </div>
+                                    </div>
+
+                                    <!-- Serial Number Dropdown (shown when product has serial tracking) -->
+                                    <div id="tech_serial_dropdown_wrap" class="mb-2" style="display: none;">
+                                        <label for="tech_product_serial" class="form-label small text-muted fw-bold mb-1">
+                                            <i class="fas fa-barcode text-primary me-1"></i>Assigned Serial Number <span class="text-danger">*</span>
+                                        </label>
+                                        <select class="form-select form-select-sm" id="tech_product_serial" name="product_serial">
+                                            <option value="">-- Select In-Stock Serial Number --</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div class="mb-2">
+                                    <label for="quick_service_description" class="form-label small text-muted fw-bold mb-1">Description / Notes</label>
                                     <input
                                         type="text"
                                         class="form-control form-control-sm"
                                         id="quick_service_description"
                                         name="description"
-                                        placeholder="Description (e.g. 512GB SSD Upgrade, Screen Replacement, Windows 11 Install)"
+                                        placeholder="Description (e.g. 512GB SSD Upgrade, Screen Replacement)"
                                         maxlength="255"
                                         required
                                     >
                                 </div>
+
                                 <div class="row g-2 align-items-end">
                                     <div class="col-sm-4">
                                         <label for="quick_part_cost" class="form-label small text-muted fw-bold mb-1">Part Cost (&#8377;)</label>
@@ -608,7 +671,7 @@
                                     </div>
                                     <div class="col-sm-4">
                                         <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold" id="quick-add-service-btn">
-                                            <i class="fas fa-plus me-1"></i> Add Service
+                                            <i class="fas fa-plus me-1"></i> Add Service / Part
                                         </button>
                                     </div>
                                 </div>
@@ -764,6 +827,8 @@
 {% endblock %}
 
 {% block extra_js %}
+<script id="tech-serials-data" type="application/json">{{ available_serials_json|default:"{}"|safe }}</script>
+<script id="tech-serials-by-number-data" type="application/json">{{ available_serials_by_number_json|default:"{}"|safe }}</script>
 <script>
 (() => {
     function getCsrf() {
@@ -1147,11 +1212,161 @@
     }
 
 
-    // Quick Add Service Log via inline form
+    // Quick Add Service Log / Product via inline form
     const quickAddServiceForm = document.getElementById('quick-add-service-form');
     const quickPartCostInput = document.getElementById('quick_part_cost');
     const quickServiceChargeInput = document.getElementById('quick_service_charge');
     const quickLineTotalEl = document.getElementById('quick_line_total');
+
+    const techModeProduct = document.getElementById('tech_mode_product');
+    const techModeCustom = document.getElementById('tech_mode_custom');
+    const techProductSection = document.getElementById('tech_product_section');
+    const techProductSelect = document.getElementById('tech_product_select');
+    const techProductQty = document.getElementById('tech_product_qty');
+    const techSerialDropdownWrap = document.getElementById('tech_serial_dropdown_wrap');
+    const techProductSerial = document.getElementById('tech_product_serial');
+    const techSerialScanner = document.getElementById('tech_serial_scanner');
+    const techClearSerialBtn = document.getElementById('tech_clear_serial_btn');
+    const techDatalist = document.getElementById('tech_available_serials_datalist');
+
+    let availableSerials = {};
+    let availableSerialsByNumber = {};
+    try {
+        const serialsEl = document.getElementById('tech-serials-data');
+        if (serialsEl) availableSerials = JSON.parse(serialsEl.textContent || '{}');
+        const serialsByNumEl = document.getElementById('tech-serials-by-number-data');
+        if (serialsByNumEl) availableSerialsByNumber = JSON.parse(serialsByNumEl.textContent || '{}');
+    } catch (e) {
+        console.error('Error parsing serials data', e);
+    }
+
+    // Populate datalist with all available serials
+    if (techDatalist) {
+        techDatalist.innerHTML = '';
+        Object.keys(availableSerialsByNumber).forEach(sn => {
+            const opt = document.createElement('option');
+            opt.value = sn;
+            techDatalist.appendChild(opt);
+        });
+    }
+
+    function syncTechMode() {
+        if (!techProductSection) return;
+        if (techModeProduct && techModeProduct.checked) {
+            techProductSection.style.display = 'block';
+        } else {
+            techProductSection.style.display = 'none';
+            if (techProductSelect) techProductSelect.value = '';
+            if (techProductSerial) techProductSerial.value = '';
+            if (techSerialScanner) techSerialScanner.value = '';
+            if (techSerialDropdownWrap) techSerialDropdownWrap.style.display = 'none';
+        }
+    }
+
+    if (techModeProduct) techModeProduct.addEventListener('change', syncTechMode);
+    if (techModeCustom) techModeCustom.addEventListener('change', syncTechMode);
+
+    function syncProductSerialDropdown(productId, preselectedSn = '') {
+        if (!techProductSerial || !techSerialDropdownWrap) return;
+        const serials = availableSerials[String(productId)] || [];
+        techProductSerial.innerHTML = '<option value="">-- Select In-Stock Serial Number --</option>';
+        serials.forEach(sn => {
+            const opt = document.createElement('option');
+            opt.value = sn;
+            opt.textContent = sn;
+            if (preselectedSn && preselectedSn.toUpperCase() === sn.toUpperCase()) {
+                opt.selected = true;
+            }
+            techProductSerial.appendChild(opt);
+        });
+        techSerialDropdownWrap.style.display = serials.length > 0 ? 'block' : 'none';
+    }
+
+    if (techProductSelect) {
+        techProductSelect.addEventListener('change', function () {
+            const selectedOpt = techProductSelect.options[techProductSelect.selectedIndex];
+            if (!selectedOpt || !selectedOpt.value) {
+                if (techSerialDropdownWrap) techSerialDropdownWrap.style.display = 'none';
+                return;
+            }
+
+            const price = parseFloat(selectedOpt.dataset.price || '0') || 0;
+            const qty = parseInt((techProductQty && techProductQty.value) || '1') || 1;
+            const isSerialized = selectedOpt.dataset.serialized === '1';
+
+            const prodName = selectedOpt.text.split(' (Stock:')[0].trim();
+            const descEl = document.getElementById('quick_service_description');
+            if (descEl && (!descEl.value || descEl.value.startsWith('Part:'))) {
+                descEl.value = 'Part: ' + prodName;
+            }
+
+            if (quickPartCostInput) {
+                quickPartCostInput.value = (price * qty).toFixed(2);
+            }
+
+            if (isSerialized) {
+                syncProductSerialDropdown(selectedOpt.value);
+            } else if (techSerialDropdownWrap) {
+                techSerialDropdownWrap.style.display = 'none';
+                if (techProductSerial) techProductSerial.value = '';
+            }
+
+            updateQuickLineTotal();
+        });
+    }
+
+    if (techProductQty) {
+        techProductQty.addEventListener('input', function () {
+            if (!techProductSelect) return;
+            const selectedOpt = techProductSelect.options[techProductSelect.selectedIndex];
+            if (selectedOpt && selectedOpt.value) {
+                const price = parseFloat(selectedOpt.dataset.price || '0') || 0;
+                const qty = parseInt(techProductQty.value || '1') || 1;
+                if (quickPartCostInput) {
+                    quickPartCostInput.value = (price * qty).toFixed(2);
+                }
+                updateQuickLineTotal();
+            }
+        });
+    }
+
+    // Serial-first scanning handler
+    if (techSerialScanner) {
+        techSerialScanner.addEventListener('input', function () {
+            const val = this.value.trim().toUpperCase();
+            if (!val) return;
+            const match = availableSerialsByNumber[val];
+            if (match) {
+                if (techModeProduct) {
+                    techModeProduct.checked = true;
+                    syncTechMode();
+                }
+                if (techProductSelect) {
+                    techProductSelect.value = String(match.product_id);
+                    const selectedOpt = techProductSelect.options[techProductSelect.selectedIndex];
+                    if (selectedOpt) {
+                        const price = parseFloat(selectedOpt.dataset.price || '0') || 0;
+                        const qty = parseInt((techProductQty && techProductQty.value) || '1') || 1;
+                        const prodName = selectedOpt.text.split(' (Stock:')[0].trim();
+                        const descEl = document.getElementById('quick_service_description');
+                        if (descEl) descEl.value = 'Part: ' + prodName;
+                        if (quickPartCostInput) quickPartCostInput.value = (price * qty).toFixed(2);
+                        syncProductSerialDropdown(match.product_id, match.serial_number);
+                        updateQuickLineTotal();
+                    }
+                }
+                techSerialScanner.classList.add('is-valid');
+                setTimeout(() => techSerialScanner.classList.remove('is-valid'), 2000);
+            }
+        });
+    }
+
+    if (techClearSerialBtn) {
+        techClearSerialBtn.addEventListener('click', function () {
+            if (techSerialScanner) techSerialScanner.value = '';
+            if (techProductSerial) techProductSerial.value = '';
+        });
+    }
 
     function updateQuickLineTotal() {
         if (!quickLineTotalEl) return;
@@ -1215,6 +1430,19 @@
             const partCost = ((quickPartCostInput && quickPartCostInput.value) || '0').trim();
             const serviceCharge = ((quickServiceChargeInput && quickServiceChargeInput.value) || '0').trim();
 
+            const isProductMode = techModeProduct && techModeProduct.checked;
+            const selectedProductVal = (techProductSelect && techProductSelect.value) || '';
+
+            if (isProductMode && selectedProductVal) {
+                const selectedOpt = techProductSelect.options[techProductSelect.selectedIndex];
+                const isSerialized = selectedOpt && selectedOpt.dataset.serialized === '1';
+                if (isSerialized && techProductSerial && !techProductSerial.value) {
+                    showMessage('add-service-message', 'Please select or scan an assigned serial number for this product.', 'error');
+                    techProductSerial.focus();
+                    return;
+                }
+            }
+
             if (!description) {
                 showMessage('add-service-message', 'Description is required.', 'error');
                 if (descriptionEl) descriptionEl.focus();
@@ -1265,8 +1493,16 @@
 
                 showMessage('add-service-message', data.message || 'Service log added successfully!', 'success');
                 quickAddServiceForm.reset();
+                if (techProductSelect) techProductSelect.value = '';
+                if (techSerialScanner) techSerialScanner.value = '';
+                if (techProductSerial) techProductSerial.value = '';
+                if (techSerialDropdownWrap) techSerialDropdownWrap.style.display = 'none';
                 if (quickPartCostInput) quickPartCostInput.value = '0';
                 if (quickServiceChargeInput) quickServiceChargeInput.value = '0';
+                if (techModeProduct) {
+                    techModeProduct.checked = true;
+                    syncTechMode();
+                }
                 updateQuickLineTotal();
 
                 if (data.html) {
