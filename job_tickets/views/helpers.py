@@ -3553,6 +3553,74 @@ def _record_inventory_entries(
 
     return created_entries
 
+def num_to_indian_words(num):
+    """
+    Convert a numeric amount into Indian Currency words (e.g. 17600 -> 'Seventeen Thousand Six Hundred Rupees Only').
+    """
+    try:
+        val = Decimal(str(num)).quantize(Decimal('0.01'))
+    except Exception:
+        return ''
+    if val < Decimal('0.00'):
+        return 'Minus ' + num_to_indian_words(-val)
+    if val == Decimal('0.00'):
+        return 'Zero Rupees Only'
+
+    rupees = int(val)
+    paise = int(round((val - Decimal(rupees)) * 100))
+
+    ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
+            'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen',
+            'Seventeen', 'Eighteen', 'Nineteen']
+    tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
+
+    def two_digits(n):
+        if n == 0:
+            return ''
+        if n < 20:
+            return ones[n]
+        rem = n % 10
+        return tens[n // 10] + (' ' + ones[rem] if rem > 0 else '')
+
+    def three_digits(n):
+        h = n // 100
+        rem = n % 100
+        res = []
+        if h > 0:
+            res.append(ones[h] + ' Hundred')
+        if rem > 0:
+            res.append(two_digits(rem))
+        return ' '.join(res)
+
+    parts = []
+    crore_val = rupees // 10000000
+    rupees %= 10000000
+    if crore_val > 0:
+        c_words = num_to_indian_words(crore_val).replace(' Rupees Only', '').replace(' Rupees', '')
+        parts.append(c_words + ' Crore')
+
+    lakh_val = rupees // 100000
+    rupees %= 100000
+    if lakh_val > 0:
+        parts.append(two_digits(lakh_val) + ' Lakh')
+
+    thousand_val = rupees // 1000
+    rupees %= 1000
+    if thousand_val > 0:
+        parts.append(two_digits(thousand_val) + ' Thousand')
+
+    if rupees > 0:
+        parts.append(three_digits(rupees))
+
+    words = ' '.join(p for p in parts if p)
+    if not words:
+        words = 'Zero'
+    words += ' Rupees'
+    if paise > 0:
+        words += ' and ' + two_digits(paise) + ' Paise'
+    return words + ' Only'
+
+
 def _prepare_inventory_sale_bill_print_context(sale_bill, sale_entries, invoice_label=''):
     subtotal_amount = Decimal('0.00')
     total_discount = Decimal('0.00')
@@ -3575,9 +3643,115 @@ def _prepare_inventory_sale_bill_print_context(sale_bill, sale_entries, invoice_
         {line.job_ticket.job_code for line in sale_entries if line.job_ticket_id}
     )
 
+    workspace = getattr(sale_bill, 'workspace', None)
+    if not workspace and getattr(sale_bill, 'party', None):
+        workspace = getattr(sale_bill.party, 'workspace', None)
+    company = CompanyProfile.get_profile(workspace=workspace)
+
+    invoice_number = (sale_bill.invoice_number or invoice_label or sale_bill.bill_number).strip()
+
+    # Credit Payments & Settlement
+    credit_payments = list(
+        sale_bill.credit_payments.filter(direction=InventoryCreditPayment.DIRECTION_RECEIVABLE).order_by('payment_date', 'id')
+    )
+    amount_paid = sum((cp.amount for cp in credit_payments), Decimal('0.00')).quantize(Decimal('0.01'))
+    if amount_paid <= Decimal('0.00') and getattr(sale_bill, 'job_ticket_id', None) and sale_bill.job_ticket:
+        amount_paid = _money_or_zero(sale_bill.job_ticket.amount_paid)
+
+    balance_due = max(Decimal('0.00'), (grand_total - amount_paid).quantize(Decimal('0.01')))
+
+    if balance_due <= Decimal('0.00') and grand_total > Decimal('0.00'):
+        payment_status = 'PAID'
+        payment_status_class = 'stamp-paid'
+    elif amount_paid > Decimal('0.00'):
+        payment_status = 'PARTIALLY PAID'
+        payment_status_class = 'stamp-partial'
+    else:
+        payment_status = 'CREDIT / DUE'
+        payment_status_class = 'stamp-due'
+
+    if credit_payments:
+        methods = [cp.get_payment_method_display() for cp in credit_payments]
+        payment_method_display = ", ".join(dict.fromkeys(methods))
+    elif getattr(sale_bill, 'job_ticket_id', None) and sale_bill.job_ticket:
+        payment_method_display = sale_bill.job_ticket.get_payment_method_display() or 'Direct'
+    else:
+        payment_method_display = 'Cash' if balance_due <= Decimal('0.00') else 'Credit'
+
+    # Serial Details & Warranty mapping for line items
+    entry_ids = [e.id for e in sale_entries if e.id]
+    serials_by_entry = {}
+    if entry_ids:
+        serial_qs = ProductItemSerial.objects.filter(sale_entry_id__in=entry_ids).select_related('product')
+        for s in serial_qs:
+            serials_by_entry.setdefault(s.sale_entry_id, []).append(s)
+
+    unmatched_sn_tokens = set()
+    for line in sale_entries:
+        if line.serial_numbers_text and not serials_by_entry.get(line.id):
+            for token in re.split(r'[,;\s]+', line.serial_numbers_text):
+                tok = token.strip()
+                if tok:
+                    unmatched_sn_tokens.add(tok)
+
+    fallback_serials_by_sn = {}
+    if unmatched_sn_tokens:
+        for s in ProductItemSerial.objects.filter(serial_number__in=unmatched_sn_tokens):
+            fallback_serials_by_sn[(s.product_id, s.serial_number)] = s
+
+    for line in sale_entries:
+        details = []
+        line_serials = serials_by_entry.get(line.id, [])
+        if line_serials:
+            for s in line_serials:
+                details.append({
+                    'serial_number': s.serial_number,
+                    'warranty_until': s.customer_warranty_until,
+                    'warranty_text': f"Warranty until {s.customer_warranty_until.strftime('%d-%b-%Y')}" if s.customer_warranty_until else None,
+                })
+        elif line.serial_numbers_text:
+            tokens = [t.strip() for t in re.split(r'[,;\s]+', line.serial_numbers_text) if t.strip()]
+            for tok in tokens:
+                s_obj = fallback_serials_by_sn.get((line.product_id, tok))
+                w_date = s_obj.customer_warranty_until if s_obj else None
+                details.append({
+                    'serial_number': tok,
+                    'warranty_until': w_date,
+                    'warranty_text': f"Warranty until {w_date.strftime('%d-%b-%Y')}" if w_date else None,
+                })
+        line.serial_details = details
+
+    # UPI QR URL
+    upi_payment_url = ''
+    if balance_due > Decimal('0.00') and company.upi_id:
+        encoded_note = quote(f"Invoice {invoice_number}")
+        encoded_name = quote(company.company_name or 'Botgi')
+        upi_payment_url = f"upi://pay?pa={company.upi_id}&pn={encoded_name}&am={balance_due}&cu=INR&tn={encoded_note}"
+
+    # WhatsApp Share URL
+    whatsapp_url = ''
+    party = getattr(sale_bill, 'party', None)
+    if party and getattr(party, 'phone', None):
+        raw_phone = re.sub(r'[^0-9]+', '', str(party.phone))
+        if len(raw_phone) == 10:
+            raw_phone = f"91{raw_phone}"
+        if raw_phone:
+            share_msg = (
+                f"Hello {party.name}, thank you for your purchase from {company.company_name}.\n"
+                f"Invoice No: {invoice_number}\n"
+                f"Date: {sale_bill.entry_date.strftime('%d-%b-%Y')}\n"
+                f"Total Amount: Rs. {grand_total}\n"
+                f"Paid: Rs. {amount_paid}\n"
+                f"Balance: Rs. {balance_due} ({payment_status})"
+            )
+            whatsapp_url = f"https://wa.me/{raw_phone}?text={quote(share_msg)}"
+
+    amount_in_words = num_to_indian_words(grand_total)
+
     return {
+        'bill': sale_bill,
         'bill_number': sale_bill.bill_number,
-        'invoice_number': (sale_bill.invoice_number or invoice_label or sale_bill.bill_number).strip(),
+        'invoice_number': invoice_number,
         'sale_entries': sale_entries,
         'party': sale_bill.party,
         'invoice_date': sale_bill.entry_date,
@@ -3589,7 +3763,16 @@ def _prepare_inventory_sale_bill_print_context(sale_bill, sale_entries, invoice_
         'taxable_total': taxable_total,
         'tax_total': tax_total,
         'grand_total': grand_total,
-        'company': CompanyProfile.get_profile(),
+        'amount_paid': amount_paid,
+        'balance_due': balance_due,
+        'payment_status': payment_status,
+        'payment_status_class': payment_status_class,
+        'payment_method_display': payment_method_display,
+        'credit_payments': credit_payments,
+        'upi_payment_url': upi_payment_url,
+        'whatsapp_url': whatsapp_url,
+        'amount_in_words': amount_in_words,
+        'company': company,
     }
 
 def _inventory_bill_group_key(entry):

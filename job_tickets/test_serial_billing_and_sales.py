@@ -220,3 +220,149 @@ class SerialBillingAndSalesTestCase(TestCase):
         self.assertEqual(self.item_serial.sale_price, Decimal('4500.00'))
         self.assertIsNotNone(self.item_serial.sale_entry)
         self.assertIsNotNone(self.item_serial.customer_warranty_until)
+
+    def test_sales_invoice_print_view_and_layout(self):
+        from job_tickets.models import InventoryBill, InventoryCreditPayment, CompanyProfile
+        from job_tickets.views.helpers import num_to_indian_words
+
+        # Test Indian Number to Words converter
+        self.assertEqual(num_to_indian_words(Decimal('17600.00')), 'Seventeen Thousand Six Hundred Rupees Only')
+        self.assertEqual(num_to_indian_words(Decimal('0.00')), 'Zero Rupees Only')
+        self.assertEqual(num_to_indian_words(Decimal('10050.50')), 'Ten Thousand Fifty Rupees and Fifty Paise Only')
+
+        # Set workspace company profile
+        CompanyProfile.objects.update_or_create(
+            workspace=self.workspace,
+            defaults={
+                'company_name': 'Botgi Tech Hub',
+                'address': '123 Electronics Street',
+                'phone1': '+919876543210',
+                'upi_id': 'botgi@upi',
+            }
+        )
+
+        party = InventoryParty.objects.create(
+            workspace=self.workspace,
+            name="Alice Customer",
+            phone="9876543211",
+            party_type='customer',
+        )
+
+        bill = InventoryBill.objects.create(
+            workspace=self.workspace,
+            bill_number='SB-202610-001',
+            invoice_number='INV-202610-001',
+            entry_type='sale',
+            entry_date=timezone.localdate(),
+            party=party,
+            created_by=self.staff_user,
+        )
+
+        entry1 = InventoryEntry.objects.create(
+            workspace=self.workspace,
+            bill=bill,
+            entry_number='SE-001',
+            entry_type='sale',
+            entry_date=timezone.localdate(),
+            party=party,
+            product=self.product,
+            quantity=1,
+            unit_price=Decimal('4500.00'),
+            total_amount=Decimal('4500.00'),
+            serial_numbers_text='SN-IP13-DISP-001',
+            created_by=self.staff_user,
+        )
+
+        # Link serial
+        self.item_serial.status = ProductItemSerial.STATUS_SOLD
+        self.item_serial.sale_entry = entry1
+        self.item_serial.customer_warranty_until = timezone.localdate() + relativedelta(months=6)
+        self.item_serial.save()
+
+        # Product 2
+        product2 = Product.objects.create(
+            workspace=self.workspace,
+            name='27-inch LED Monitor',
+            sku='MON-27-001',
+            unit_price=Decimal('13100.00'),
+            cost_price=Decimal('10000.00'),
+            stock_quantity=2,
+            has_serial_tracking=True,
+            customer_warranty_months=12,
+            is_active=True,
+        )
+        entry2 = InventoryEntry.objects.create(
+            workspace=self.workspace,
+            bill=bill,
+            entry_number='SE-002',
+            entry_type='sale',
+            entry_date=timezone.localdate(),
+            party=party,
+            product=product2,
+            quantity=1,
+            unit_price=Decimal('13100.00'),
+            total_amount=Decimal('13100.00'),
+            serial_numbers_text='SN-MON-9988',
+            created_by=self.staff_user,
+        )
+        ProductItemSerial.objects.create(
+            workspace=self.workspace,
+            product=product2,
+            serial_number='SN-MON-9988',
+            status=ProductItemSerial.STATUS_SOLD,
+            sale_entry=entry2,
+            customer_warranty_until=timezone.localdate() + relativedelta(months=12),
+        )
+
+        # Record payment for the bill
+        InventoryCreditPayment.objects.create(
+            workspace=self.workspace,
+            party=party,
+            bill=bill,
+            direction=InventoryCreditPayment.DIRECTION_RECEIVABLE,
+            payment_date=timezone.localdate(),
+            payment_method='upi',
+            amount=Decimal('17600.00'),
+            balance_before=Decimal('17600.00'),
+            balance_after=Decimal('0.00'),
+            created_by=self.staff_user,
+        )
+
+        url = reverse('inventory_sales_print_bill_view', args=[bill.id])
+        res = self.client.get(url)
+        self.assertEqual(res.status_code, 200)
+
+        # Verify context variables
+        ctx = res.context
+        self.assertEqual(ctx['total_quantity'], 2)
+        self.assertEqual(ctx['grand_total'], Decimal('17600.00'))
+        self.assertEqual(ctx['amount_paid'], Decimal('17600.00'))
+        self.assertEqual(ctx['balance_due'], Decimal('0.00'))
+        self.assertEqual(ctx['payment_status'], 'PAID')
+        self.assertEqual(ctx['amount_in_words'], 'Seventeen Thousand Six Hundred Rupees Only')
+        self.assertEqual(ctx['company'].company_name, 'Botgi Tech Hub')
+
+        html = res.content.decode('utf-8')
+
+        # 1. Verify "Invoice Summary" is NOT in HTML as user requested
+        self.assertNotIn('Invoice Summary', html)
+
+        # 2. Verify total quantity is in the table footer under Qty column
+        self.assertIn('Total Qty:', html)
+        self.assertIn('tfoot-qty-val', html)
+        self.assertIn('>2</td>', html)
+        self.assertIn('Grand Total:', html)
+        self.assertIn('17600.00', html)
+
+        # 3. Verify Serial Number and warranty badge
+        self.assertIn('SN-IP13-DISP-001', html)
+        self.assertIn('SN-MON-9988', html)
+        self.assertIn('Warranty until', html)
+
+        # 4. Verify Amount in Words
+        self.assertIn('Seventeen Thousand Six Hundred Rupees Only', html)
+
+        # 5. Verify Customer Details and Payment Status
+        self.assertIn('Alice Customer', html)
+        self.assertIn('PAID', html)
+

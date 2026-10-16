@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    {% load job_tickets_extras %}
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales Invoice - {{ invoice_number }}</title>
     {% if company.display_logo_url %}
     <link rel="icon" type="image/png" href="{{ company.display_logo_url }}">
@@ -9,225 +11,1129 @@
     <link rel="icon" type="image/png" href="/static/img/logo.png">
     {% endif %}
     <style>
+        :root {
+            --ink-900: #0f172a;
+            --ink-800: #1e293b;
+            --ink-700: #334155;
+            --ink-500: #64748b;
+            --ink-400: #94a3b8;
+            --border-color: #cbd5e1;
+            --border-light: #e2e8f0;
+            --accent-bg: #f8fafc;
+            --success-green: #15803d;
+            --success-bg: #f0fdf4;
+            --success-border: #bbf7d0;
+            --warning-amber: #b45309;
+            --warning-bg: #fffbeb;
+            --warning-border: #fde68a;
+            --danger-red: #b91c1c;
+            --danger-bg: #fef2f2;
+            --danger-border: #fecaca;
+            --brand-blue: #0369a1;
+            --brand-bg: #f0f9ff;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.45;
+            color: var(--ink-900);
+            background-color: #f1f5f9;
             margin: 0;
-            padding: 0;
-            background: #f5f6f8;
-            color: #1f2937;
+            padding: 24px 0;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
         }
-        .invoice-wrap {
-            max-width: 860px;
-            margin: 20px auto;
-            background: #fff;
-            border: 1px solid #d9dce1;
-            padding: 22px;
+
+        /* Screen Toolbar */
+        .screen-toolbar {
+            max-width: {{ company.bill_print_page_width_css|default:"210mm" }};
+            margin: 0 auto 16px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #ffffff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+            gap: 12px;
+            flex-wrap: wrap;
         }
-        .head {
-            display: grid;
-            grid-template-columns: 1fr 1.2fr;
-            gap: 18px;
-            border-bottom: 2px solid #111827;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
+
+        .screen-toolbar .toolbar-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--ink-800);
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        .company-logo img {
-            max-width: 120px;
-            height: auto;
+
+        .screen-toolbar .format-badge {
+            font-size: 10.5px;
+            font-weight: 600;
+            background: #e2e8f0;
+            color: var(--ink-700);
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
         }
-        .invoice-meta {
+
+        .toolbar-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 12.5px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: 1px solid transparent;
+        }
+
+        .btn-print {
+            background-color: #0f172a;
+            color: #ffffff;
+        }
+
+        .btn-print:hover {
+            background-color: #334155;
+        }
+
+        .btn-whatsapp {
+            background-color: #25D366;
+            color: #ffffff;
+        }
+
+        .btn-whatsapp:hover {
+            background-color: #1eb855;
+        }
+
+        .btn-back {
+            background-color: #ffffff;
+            color: var(--ink-700);
+            border-color: var(--border-color);
+        }
+
+        .btn-back:hover {
+            background-color: #f8fafc;
+        }
+
+        .no-print {
+            /* Kept for screen only */
+        }
+
+        /* Invoice Container */
+        .invoice-wrapper {
+            max-width: {{ company.bill_print_page_width_css|default:"210mm" }};
+            margin: 0 auto;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+            padding: 24px 28px;
+        }
+
+        /* Header Section */
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid var(--ink-900);
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            gap: 16px;
+        }
+
+        .brand-block {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+            flex: 1.2;
+        }
+
+        .brand-logo img {
+            max-width: 110px;
+            max-height: 60px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .brand-logo-fallback {
+            width: 52px;
+            height: 52px;
+            background: var(--ink-900);
+            color: #ffffff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        .brand-details h1 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            color: var(--ink-900);
+            line-height: 1.2;
+        }
+
+        .brand-legal {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: var(--ink-700);
+            margin: 2px 0;
+        }
+
+        .brand-tagline {
+            font-size: 11px;
+            color: var(--ink-500);
+            margin-bottom: 4px;
+        }
+
+        .brand-address {
+            font-size: 11px;
+            color: var(--ink-700);
+            margin: 2px 0;
+            line-height: 1.35;
+        }
+
+        .brand-tax-tags {
+            margin-top: 5px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            font-size: 10.5px;
+            color: var(--ink-800);
+        }
+
+        .brand-tax-tags span {
+            background: #f1f5f9;
+            padding: 1px 6px;
+            border-radius: 4px;
+            border: 1px solid #e2e8f0;
+        }
+
+        /* Invoice Badge Box (Right Header) */
+        .invoice-badge-box {
             text-align: right;
+            min-width: 220px;
+            flex: 0.9;
         }
-        .invoice-meta h2 {
-            margin: 0 0 5px;
-            font-size: 1.35rem;
+
+        .invoice-title {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            color: var(--ink-900);
+            text-transform: uppercase;
+            margin: 0 0 6px 0;
         }
-        .invoice-meta p {
-            margin: 3px 0;
-            font-size: 0.92rem;
+
+        .invoice-meta-table {
+            width: 100%;
+            margin-top: 4px;
+            font-size: 11.5px;
         }
-        .meta-grid {
+
+        .invoice-meta-table tr td {
+            padding: 2px 0;
+            border: none;
+        }
+
+        .invoice-meta-table tr td:first-child {
+            color: var(--ink-500);
+            text-align: right;
+            padding-right: 8px;
+        }
+
+        .invoice-meta-table tr td:last-child {
+            text-align: right;
+            font-weight: 700;
+            color: var(--ink-900);
+        }
+
+        /* Settlement Stamp */
+        .settlement-stamp {
+            display: inline-block;
+            margin-top: 8px;
+            padding: 4px 10px;
+            border-radius: 5px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+        }
+
+        .stamp-paid {
+            background: var(--success-bg);
+            color: var(--success-green);
+            border: 1.5px solid var(--success-border);
+        }
+
+        .stamp-partial {
+            background: var(--warning-bg);
+            color: var(--warning-amber);
+            border: 1.5px solid var(--warning-border);
+        }
+
+        .stamp-due {
+            background: var(--danger-bg);
+            color: var(--danger-red);
+            border: 1.5px solid var(--danger-border);
+        }
+
+        /* Customer & Info Grid */
+        .info-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr {% if linked_job_codes or notes %}1fr{% endif %};
             gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .card-box {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 10px 14px;
+        }
+
+        .card-title {
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--ink-500);
+            margin: 0 0 6px 0;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 4px;
+        }
+
+        .party-name {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--ink-900);
+            margin-bottom: 4px;
+        }
+
+        .party-line {
+            display: flex;
+            gap: 6px;
+            font-size: 11.5px;
+            margin-bottom: 2px;
+            color: var(--ink-800);
+        }
+
+        .party-line span {
+            color: var(--ink-500);
+            min-width: 55px;
+        }
+
+        .ref-line {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11.5px;
+            margin-bottom: 3px;
+        }
+
+        .ref-line span {
+            color: var(--ink-500);
+        }
+
+        .notes-line {
+            display: block;
+            margin-top: 4px;
+            padding-top: 4px;
+            border-top: 1px dashed var(--border-light);
+            font-size: 11px;
+            color: var(--ink-700);
+        }
+
+        /* Items Table */
+        .items-section {
             margin-bottom: 14px;
-            border-bottom: 1px solid #e5e7eb;
-            padding-bottom: 10px;
         }
-        .meta-grid h4 {
-            margin: 0 0 6px;
-            font-size: 1rem;
-        }
-        .meta-grid p {
-            margin: 3px 0;
-            font-size: 0.9rem;
-        }
-        table {
+
+        .items-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 6px;
-            font-size: 0.9rem;
+            font-size: 11.5px;
+            margin-top: 4px;
         }
-        th, td {
-            border: 1px solid #d1d5db;
-            padding: 8px 7px;
-        }
-        th {
-            background: #f3f4f6;
+
+        .items-table th {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            color: var(--ink-800);
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            padding: 7px 8px;
             text-align: left;
         }
-        .num {
+
+        .items-table td {
+            border: 1px solid var(--border-light);
+            padding: 7px 8px;
+            vertical-align: top;
+        }
+
+        .items-table tr:nth-child(even) td {
+            background-color: #fafbfc;
+        }
+
+        .items-table .col-center {
+            text-align: center;
+        }
+
+        .items-table .col-right {
             text-align: right;
             white-space: nowrap;
         }
-        .totals {
-            margin-top: 12px;
-            width: 320px;
-            margin-left: auto;
+
+        .item-name {
+            font-weight: 700;
+            color: var(--ink-900);
+            font-size: 12px;
         }
-        .totals .row {
+
+        .item-notes {
+            font-size: 10.5px;
+            color: var(--ink-500);
+            margin-top: 2px;
+        }
+
+        .serials-wrap {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .serial-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            padding: 2px 7px;
+            font-size: 10px;
+        }
+
+        .serial-pill .sn {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-weight: 700;
+            color: var(--ink-900);
+        }
+
+        .serial-pill .warranty-text {
+            color: var(--success-green);
+            font-weight: 600;
+        }
+
+        /* Table Footer Row with Total Quantity strictly aligned under Qty */
+        .items-table tfoot .table-tfoot-row td {
+            border-top: 2px solid var(--ink-900);
+            border-bottom: 2px solid var(--ink-900);
+            background: #f8fafc;
+            padding: 8px 8px;
+            font-weight: 800;
+        }
+
+        .tfoot-qty-label {
+            text-align: right;
+            text-transform: uppercase;
+            font-size: 11px;
+            color: var(--ink-800);
+            letter-spacing: 0.3px;
+        }
+
+        .tfoot-qty-val {
+            font-size: 13px;
+            color: var(--ink-900);
+        }
+
+        .tfoot-grand-label {
+            text-align: right;
+            text-transform: uppercase;
+            font-size: 11px;
+            color: var(--ink-800);
+            letter-spacing: 0.3px;
+        }
+
+        .tfoot-grand-val {
+            font-size: 13.5px;
+            color: var(--ink-900);
+        }
+
+        /* Amount in Words Callout */
+        .amount-in-words-box {
+            margin-top: 10px;
+            background: #f8fafc;
+            border: 1px dashed var(--border-color);
+            border-radius: 6px;
+            padding: 7px 12px;
+            font-size: 11px;
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .amount-in-words-box .label {
+            color: var(--ink-500);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 10px;
+            white-space: nowrap;
+        }
+
+        .amount-in-words-box .words {
+            font-weight: 700;
+            color: var(--ink-900);
+            font-style: italic;
+        }
+
+        /* Financial & Settlement Grid */
+        .settlement-grid {
+            display: grid;
+            grid-template-columns: 1.15fr 0.85fr;
+            gap: 16px;
+            margin-top: 14px;
+            align-items: start;
+        }
+
+        .banking-box {
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 10px 14px;
+        }
+
+        .banking-details-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 3px 10px;
+            font-size: 11px;
+            margin-top: 4px;
+        }
+
+        .banking-label {
+            color: var(--ink-500);
+        }
+
+        .banking-val {
+            font-weight: 600;
+            color: var(--ink-900);
+        }
+
+        .upi-qr-block {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px dashed var(--border-light);
+        }
+
+        .upi-qr-block img {
+            width: 72px;
+            height: 72px;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 2px;
+        }
+
+        .upi-qr-text {
+            font-size: 10.5px;
+            line-height: 1.35;
+            color: var(--ink-700);
+        }
+
+        .upi-qr-text strong {
+            color: var(--ink-900);
+            display: block;
+        }
+
+        /* Totals Calculation Card */
+        .totals-card {
+            background: #f8fafc;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .totals-row {
             display: flex;
             justify-content: space-between;
-            padding: 4px 0;
-            font-size: 0.92rem;
+            padding: 5px 12px;
+            font-size: 11.5px;
+            border-bottom: 1px solid var(--border-light);
         }
-        .totals .grand {
-            border-top: 1px solid #d1d5db;
-            margin-top: 5px;
-            padding-top: 7px;
-            font-weight: 700;
-            font-size: 1rem;
+
+        .totals-row:last-child {
+            border-bottom: none;
         }
-        .notes {
-            margin-top: 14px;
-            border-top: 1px dashed #cbd5e1;
-            padding-top: 10px;
-            font-size: 0.9rem;
+
+        .totals-row .lbl {
+            color: var(--ink-700);
         }
-        .print-actions {
-            text-align: center;
-            margin: 16px 0;
+
+        .totals-row .val {
+            font-weight: 600;
+            color: var(--ink-900);
+            text-align: right;
+            white-space: nowrap;
         }
-        .print-actions button {
-            padding: 9px 16px;
+
+        .totals-row.discount-row .val {
+            color: var(--success-green);
+        }
+
+        .totals-row.grand-row {
+            background: #ffffff;
+            border-top: 1.5px solid var(--ink-900);
+            border-bottom: 1.5px solid var(--ink-900);
+            padding: 8px 12px;
+        }
+
+        .totals-row.grand-row .lbl {
+            font-size: 12.5px;
+            font-weight: 800;
+            color: var(--ink-900);
+            text-transform: uppercase;
+        }
+
+        .totals-row.grand-row .val {
             font-size: 14px;
-            cursor: pointer;
+            font-weight: 800;
+            color: var(--ink-900);
         }
+
+        .totals-row.paid-row {
+            background: #fafbfc;
+        }
+
+        .totals-row.balance-row {
+            padding: 7px 12px;
+            background: #f1f5f9;
+        }
+
+        .totals-row.balance-row .lbl {
+            font-weight: 800;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+
+        .totals-row.balance-row .val {
+            font-size: 12.5px;
+            font-weight: 800;
+        }
+
+        .val-zero {
+            color: var(--success-green) !important;
+        }
+
+        .val-due {
+            color: var(--danger-red) !important;
+        }
+
+        /* Policy & Terms */
+        .policy-block {
+            margin-top: 14px;
+            border-top: 1px solid var(--border-light);
+            padding-top: 10px;
+        }
+
+        .policy-box {
+            font-size: 10px;
+            color: var(--ink-700);
+            line-height: 1.35;
+        }
+
+        .policy-box h4 {
+            font-size: 9.5px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: var(--ink-900);
+            margin: 0 0 3px 0;
+        }
+
+        /* Footer & Signatures */
+        .footer-section {
+            margin-top: 18px;
+            border-top: 1px solid var(--border-color);
+            padding-top: 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 16px;
+        }
+
+        .signatures-col {
+            width: 100%;
+            display: flex;
+            gap: 24px;
+            justify-content: space-between;
+        }
+
+        .sign-box {
+            text-align: center;
+            min-width: 150px;
+        }
+
+        .sign-line {
+            border-top: 1px solid var(--ink-900);
+            margin-bottom: 4px;
+            height: 38px;
+        }
+
+        .sign-label {
+            font-size: 9.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--ink-900);
+        }
+
+        .sign-sub {
+            font-size: 8.5px;
+            color: var(--ink-500);
+        }
+
+        .thank-you-bar {
+            text-align: center;
+            margin-top: 14px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-light);
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--ink-500);
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+
+        /* Print Media Rules */
         @media print {
             @page {
                 size: {{ company.bill_print_page_size_css|default:"A4 portrait" }};
-                margin: {{ company.bill_print_margin_css|default:"12mm" }};
+                margin: {{ company.bill_print_margin_css|default:"10mm" }};
             }
+
             body {
-                background: #fff;
+                background: #ffffff !important;
+                padding: 0 !important;
             }
-            .invoice-wrap {
-                width: {{ company.bill_print_page_width_css|default:"210mm" }};
-                margin: 0;
-                border: none;
-                max-width: none;
-                padding: 0;
-            }
-            .print-actions {
+
+            .no-print, .screen-toolbar {
                 display: none !important;
             }
+
+            .invoice-wrapper {
+                width: 100% !important;
+                max-width: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+
+            .card-box, .totals-card, .banking-box, .items-table th, .items-table td {
+                page-break-inside: avoid;
+            }
         }
+
+        /* 80mm Thermal Print Format Support */
+        {% if company.bill_print_paper_size == 'thermal_80' %}
+        body {
+            padding: 4px 0;
+            font-size: 10px;
+        }
+        .invoice-wrapper {
+            max-width: 80mm !important;
+            padding: 6px 8px !important;
+            border: none;
+            box-shadow: none;
+        }
+        .invoice-header {
+            flex-direction: column !important;
+            text-align: center !important;
+            gap: 8px;
+        }
+        .brand-block {
+            flex-direction: column !important;
+            align-items: center !important;
+            text-align: center !important;
+        }
+        .brand-details h1 {
+            font-size: 16px;
+        }
+        .brand-tax-tags {
+            justify-content: center;
+        }
+        .invoice-badge-box {
+            text-align: center !important;
+            min-width: 100%;
+        }
+        .invoice-meta-table tr td {
+            text-align: center !important;
+        }
+        .info-grid {
+            grid-template-columns: 1fr !important;
+            gap: 8px;
+        }
+        .settlement-grid {
+            grid-template-columns: 1fr !important;
+            gap: 10px;
+        }
+        .signatures-col {
+            flex-direction: column !important;
+            align-items: center !important;
+            gap: 16px;
+        }
+        {% endif %}
     </style>
 </head>
 <body>
-    <div class="invoice-wrap">
-        <div class="head">
-            <div class="company-logo">
-                {% if company.logo %}
-                    <img src="{{ company.logo.url }}" alt="{{ company.company_name }} logo">
-                {% elif company.logo_url %}
-                    <img src="{{ company.logo_url }}" alt="{{ company.company_name }} logo">
-                {% endif %}
-                <p><strong>{{ company.company_name }}</strong></p>
-                <p>{{ company.address }}</p>
-                <p>{{ company.phone1 }}{% if company.phone2 %} | {{ company.phone2 }}{% endif %}</p>
-            </div>
-            <div class="invoice-meta">
-                <h2>Sales Invoice</h2>
-                <p><strong>Invoice:</strong> {{ invoice_number }}</p>
-                <p><strong>Date:</strong> {{ invoice_date|date:"Y-m-d" }}</p>
-                {% if linked_job_codes %}
-                    <p><strong>Linked Job:</strong> {{ linked_job_codes|join:", " }}</p>
-                {% endif %}
-            </div>
+
+    <!-- SCREEN ACTION TOOLBAR (Hidden in Print) -->
+    <div class="screen-toolbar no-print">
+        <div class="toolbar-title">
+            <span>Sales Invoice</span>
+            <span class="format-badge">{{ company.get_bill_print_paper_size_display|default:"A4" }}</span>
+            <span style="font-weight: 400; color: var(--ink-500);">• #{{ invoice_number }}</span>
         </div>
-
-        <div class="meta-grid">
-            <div>
-                <h4>Party</h4>
-                <p><strong>{{ party.name }}</strong></p>
-                {% if party.phone %}<p>Phone: {{ party.phone }}</p>{% endif %}
-            </div>
-            <div>
-                <h4>Invoice Summary</h4>
-                <p>{{ sale_entries|length }} line(s)</p>
-                <p>Total Qty: {{ total_quantity }}</p>
-            </div>
-        </div>
-
-        <table>
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Product</th>
-                    <th class="num">Qty</th>
-                    <th class="num">Rate</th>
-                    <th class="num">Amount</th>
-                    <th class="num">Discount</th>
-                    <th class="num">Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for line in sale_entries %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>
-                        {{ line.product.name }}
-                        {% if line.notes %}
-                            <div style="font-size: 0.8rem; color: #4b5563; margin-top: 2px;">
-                                {{ line.notes }}
-                            </div>
-                        {% endif %}
-                        {% if line.serial_numbers_text %}
-                            <div style="font-size: 0.78rem; color: #4b5563; font-family: monospace; margin-top: 2px;">
-                                <strong>S/N:</strong> {{ line.serial_numbers_text }}
-                            </div>
-                        {% endif %}
-                    </td>
-                    <td class="num">{{ line.quantity }}</td>
-                    <td class="num">&#8377;{{ line.unit_price|floatformat:2 }}</td>
-                    <td class="num">&#8377;{{ line.line_subtotal|floatformat:2 }}</td>
-                    <td class="num">&#8377;{{ line.discount_amount|floatformat:2 }}</td>
-                    <td class="num"><strong>&#8377;{{ line.total_amount|floatformat:2 }}</strong></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        <div class="totals">
-            <div class="row"><span>Subtotal</span><strong>&#8377;{{ subtotal_amount|floatformat:2 }}</strong></div>
-            {% if total_discount > 0 %}
-            <div class="row"><span>Total Discount</span><strong>&#8377;{{ total_discount|floatformat:2 }}</strong></div>
+        <div class="toolbar-actions">
+            {% if whatsapp_url %}
+            <a href="{{ whatsapp_url }}" target="_blank" class="btn-action btn-whatsapp" title="Share invoice details on WhatsApp">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981z"/>
+                </svg>
+                Share on WhatsApp
+            </a>
             {% endif %}
-            <div class="row grand"><span>Grand Total</span><strong>&#8377;{{ grand_total|floatformat:2 }}</strong></div>
+            <button type="button" class="btn-action btn-print" onclick="return BotgiPrintHelper.startPrint();">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                Print Invoice
+            </button>
+            <a href="{% url 'inventory_sales_dashboard' %}" class="btn-action btn-back">Back to Sales</a>
         </div>
-
-        {% if notes %}
-        <div class="notes">
-            <strong>Notes:</strong><br>
-            {{ notes|linebreaksbr }}
-        </div>
-        {% endif %}
     </div>
 
-    <div class="print-actions">
-        <button type="button" onclick="return BotgiPrintHelper.startPrint();">Print Invoice</button>
+    <!-- MAIN INVOICE WRAPPER -->
+    <div class="invoice-wrapper">
+
+        <!-- HEADER SECTION -->
+        <header class="invoice-header">
+            <div class="brand-block">
+                {% if company.display_logo_url %}
+                <div class="brand-logo">
+                    <img src="{{ company.display_logo_url }}" alt="{{ company.company_name }}">
+                </div>
+                {% else %}
+                <div class="brand-logo-fallback">
+                    {{ company.company_name|slice:":1"|upper }}
+                </div>
+                {% endif %}
+                <div class="brand-details">
+                    <h1>{{ company.company_name }}</h1>
+                    {% if company.legal_name and company.legal_name != company.company_name %}
+                    <div class="brand-legal">{{ company.legal_name }}</div>
+                    {% endif %}
+                    {% if company.tagline %}
+                    <div class="brand-tagline">{{ company.tagline }}</div>
+                    {% endif %}
+                    <div class="brand-address">
+                        {{ company.address }}{% if company.city %}, {{ company.city }}{% endif %}{% if company.state %}, {{ company.state }}{% endif %}{% if company.pincode %} - {{ company.pincode }}{% endif %}
+                    </div>
+                    <div class="brand-address">
+                        <strong>Ph:</strong> {{ company.phone1 }}{% if company.phone2 %} | {{ company.phone2 }}{% endif %}
+                        {% if company.email %} | <strong>Email:</strong> {{ company.email }}{% endif %}
+                        {% if company.website %} | {{ company.website }}{% endif %}
+                    </div>
+                    <div class="brand-tax-tags">
+                        {% if company.pan %}<span><strong>PAN:</strong> {{ company.pan }}</span>{% endif %}
+                        {% if company.gstin %}<span><strong>GSTIN:</strong> {{ company.gstin }}</span>{% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="invoice-badge-box">
+                <div class="invoice-title">
+                    SALES INVOICE
+                </div>
+                <table class="invoice-meta-table">
+                    <tr>
+                        <td>Invoice No:</td>
+                        <td>{{ invoice_number }}</td>
+                    </tr>
+                    <tr>
+                        <td>Date:</td>
+                        <td>{{ invoice_date|date:"d M Y" }}</td>
+                    </tr>
+                    {% if linked_job_codes %}
+                    <tr>
+                        <td>Linked Job:</td>
+                        <td>#{{ linked_job_codes|join:", #" }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if company.state %}
+                    <tr>
+                        <td>Place of Supply:</td>
+                        <td>{{ company.state }}{% if company.state_code %} ({{ company.state_code }}){% endif %}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+                <div class="settlement-stamp {{ payment_status_class }}">
+                    {{ payment_status }}
+                </div>
+            </div>
+        </header>
+
+        <!-- CUSTOMER / BILLED TO SECTION -->
+        <section class="info-grid">
+            <div class="card-box">
+                <div class="card-title">Billed To (Customer Details)</div>
+                <div class="party-name">{{ party.name|default:"Direct Retail Customer" }}</div>
+                {% if party.phone %}
+                <div class="party-line"><span>Phone:</span> <strong>{{ party.phone }}</strong></div>
+                {% endif %}
+                {% if party.address %}
+                <div class="party-line"><span>Address:</span> {{ party.address }}</div>
+                {% endif %}
+                {% if party.gstin %}
+                <div class="party-line"><span>GSTIN:</span> {{ party.gstin }}</div>
+                {% endif %}
+            </div>
+
+            {% if linked_job_codes or notes %}
+            <div class="card-box">
+                <div class="card-title">Reference &amp; Remarks</div>
+                {% if linked_job_codes %}
+                <div class="ref-line">
+                    <span>Linked Job Ticket:</span>
+                    <strong>#{{ linked_job_codes|join:", #" }}</strong>
+                </div>
+                {% endif %}
+                <div class="ref-line">
+                    <span>Payment Status:</span>
+                    <strong>{{ payment_status }} ({{ payment_method_display }})</strong>
+                </div>
+                {% if notes %}
+                <div class="notes-line">
+                    <strong>Notes:</strong> {{ notes|linebreaksbr }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- ITEMIZED PRODUCTS & SERIALS TABLE -->
+        <section class="items-section">
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th class="col-center" style="width: 36px;">#</th>
+                        <th>Item &amp; Description</th>
+                        <th class="col-center" style="width: 65px;">Qty</th>
+                        <th class="col-right" style="width: 95px;">Rate (&#8377;)</th>
+                        <th class="col-right" style="width: 95px;">Amount (&#8377;)</th>
+                        <th class="col-right" style="width: 85px;">Discount (&#8377;)</th>
+                        <th class="col-right" style="width: 105px;">Total (&#8377;)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in sale_entries %}
+                    <tr>
+                        <td class="col-center">{{ forloop.counter }}</td>
+                        <td>
+                            <div class="item-name">{{ line.product.name }}</div>
+                            {% if line.notes %}
+                                <div class="item-notes">{{ line.notes }}</div>
+                            {% endif %}
+                            {% if line.serial_details %}
+                                <div class="serials-wrap">
+                                    {% for s in line.serial_details %}
+                                    <span class="serial-pill">
+                                        <span class="sn">S/N: {{ s.serial_number }}</span>
+                                        {% if s.warranty_text %}
+                                        <span class="warranty-text">&bull; {{ s.warranty_text }}</span>
+                                        {% endif %}
+                                    </span>
+                                    {% endfor %}
+                                </div>
+                            {% elif line.serial_numbers_text %}
+                                <div class="serials-wrap">
+                                    <span class="serial-pill">
+                                        <span class="sn">S/N: {{ line.serial_numbers_text }}</span>
+                                    </span>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="col-center" style="font-weight: 700;">{{ line.quantity }}</td>
+                        <td class="col-right">&#8377;{{ line.unit_price|floatformat:2 }}</td>
+                        <td class="col-right">&#8377;{{ line.line_subtotal|floatformat:2 }}</td>
+                        <td class="col-right">{% if line.discount_amount > 0 %}&#8377;{{ line.discount_amount|floatformat:2 }}{% else %}&#8212;{% endif %}</td>
+                        <td class="col-right" style="font-weight: 700;">&#8377;{{ line.total_amount|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="table-tfoot-row">
+                        <td colspan="2" class="tfoot-qty-label">Total Qty:</td>
+                        <td class="col-center tfoot-qty-val">{{ total_quantity }}</td>
+                        <td colspan="3" class="tfoot-grand-label">Grand Total:</td>
+                        <td class="col-right tfoot-grand-val">&#8377;{{ grand_total|floatformat:2 }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <!-- AMOUNT IN WORDS -->
+            {% if amount_in_words %}
+            <div class="amount-in-words-box">
+                <span class="label">Amount in Words:</span>
+                <span class="words">{{ amount_in_words }}</span>
+            </div>
+            {% endif %}
+        </section>
+
+        <!-- FINANCIAL & SETTLEMENT SECTION -->
+        <section class="settlement-grid">
+            <!-- Left Column: Payment & Banking Details -->
+            <div class="banking-box">
+                <div class="card-title">Payment Settlement &amp; Bank Details</div>
+                <div class="banking-details-grid">
+                    <span class="banking-label">Payment Mode:</span>
+                    <span class="banking-val">{{ payment_method_display }}</span>
+
+                    <span class="banking-label">Payment Status:</span>
+                    <span class="banking-val">{{ payment_status }}</span>
+
+                    {% if company.bank_name %}
+                    <span class="banking-label">Bank Name:</span>
+                    <span class="banking-val">{{ company.bank_name }}</span>
+                    {% endif %}
+
+                    {% if company.account_number %}
+                    <span class="banking-label">Account No:</span>
+                    <span class="banking-val">{{ company.account_number }}</span>
+                    {% endif %}
+
+                    {% if company.ifsc_code %}
+                    <span class="banking-label">IFSC Code:</span>
+                    <span class="banking-val">{{ company.ifsc_code }}</span>
+                    {% endif %}
+
+                    {% if company.branch %}
+                    <span class="banking-label">Branch:</span>
+                    <span class="banking-val">{{ company.branch }}</span>
+                    {% endif %}
+
+                    {% if company.upi_id %}
+                    <span class="banking-label">UPI ID / VPA:</span>
+                    <span class="banking-val">{{ company.upi_id }}</span>
+                    {% endif %}
+                </div>
+
+                {% if balance_due > 0 and upi_payment_url %}
+                <div class="upi-qr-block">
+                    <img src="https://api.qrserver.com/v1/create-qr-code/?size=110x110&data={{ upi_payment_url|urlencode }}" alt="UPI QR">
+                    <div class="upi-qr-text">
+                        <strong>Scan to Pay Balance</strong>
+                        Scan via GPay / PhonePe / Paytm / BHIM to settle <strong>&#8377;{{ balance_due|floatformat:2 }}</strong> for Invoice {{ invoice_number }}.
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Right Column: Financial Calculation Card -->
+            <div class="totals-card">
+                <div class="totals-row">
+                    <span class="lbl">Subtotal:</span>
+                    <span class="val">&#8377;{{ subtotal_amount|floatformat:2 }}</span>
+                </div>
+
+                {% if total_discount > 0 %}
+                <div class="totals-row discount-row">
+                    <span class="lbl">Total Discount:</span>
+                    <span class="val">- &#8377;{{ total_discount|floatformat:2 }}</span>
+                </div>
+                {% endif %}
+
+                <div class="totals-row grand-row">
+                    <span class="lbl">Invoice Grand Total:</span>
+                    <span class="val">&#8377;{{ grand_total|floatformat:2 }}</span>
+                </div>
+
+                <div class="totals-row paid-row">
+                    <span class="lbl">Amount Paid:</span>
+                    <span class="val">&#8377;{{ amount_paid|floatformat:2 }}</span>
+                </div>
+
+                <div class="totals-row balance-row">
+                    <span class="lbl">Balance Due:</span>
+                    <span class="val {% if balance_due <= 0 %}val-zero{% else %}val-due{% endif %}">
+                        &#8377;{{ balance_due|floatformat:2 }}
+                    </span>
+                </div>
+            </div>
+        </section>
+
+        <!-- TERMS & CONDITIONS SECTION -->
+        <section class="policy-block">
+            <div class="policy-box">
+                <h4>Terms &amp; Conditions</h4>
+                <p style="margin: 0;">
+                    {{ company.terms_conditions|default:"1. Goods once sold will not be taken back or refunded.<br>2. Warranty claims are subject to original manufacturer policies and coverage terms.<br>3. Invoice copy must be produced for all warranty verification and support."|linebreaksbr }}
+                </p>
+            </div>
+        </section>
+
+        <!-- DUAL SIGNATURES FOOTER -->
+        <footer class="footer-section">
+            <div class="signatures-col">
+                <div class="sign-box">
+                    <div class="sign-line"></div>
+                    <div class="sign-label">Customer Signature</div>
+                    <div class="sign-sub">Goods received in good order</div>
+                </div>
+
+                <div class="sign-box">
+                    <div class="sign-line"></div>
+                    <div class="sign-label">For {{ company.company_name }}</div>
+                    <div class="sign-sub">Authorized Signatory</div>
+                </div>
+            </div>
+        </footer>
+
+        <div class="thank-you-bar">
+            Thank you for choosing {{ company.company_name }}!
+        </div>
     </div>
+
+    <!-- Print Automation Script -->
     {% include "job_tickets/includes/print_flow_script.html" %}
 </body>
 </html>
