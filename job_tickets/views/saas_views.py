@@ -11,6 +11,7 @@ from django.db import transaction
 from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from django.views.decorators.cache import never_cache
@@ -192,14 +193,31 @@ def saas_register(request):
                         is_active=True,
                     )
 
-                    # 4. Create default CompanyProfile
-                    CompanyProfile.objects.create(
-                        workspace=workspace,
-                        company_name=company_name,
-                        email=email,
-                        phone1=phone or '',
-                        tagline='Service & Repair Center',
-                    )
+                    # 4. Create default CompanyProfile with self-healing sequence sync
+                    profile = CompanyProfile.objects.filter(workspace=workspace).first()
+                    if not profile:
+                        try:
+                            CompanyProfile.objects.create(
+                                workspace=workspace,
+                                company_name=company_name,
+                                email=email,
+                                phone1=phone or '',
+                                tagline='Service & Repair Center',
+                            )
+                        except Exception as cp_err:
+                            from django.db import connection
+                            if connection.vendor == 'postgresql':
+                                with connection.cursor() as cursor:
+                                    cursor.execute("SELECT setval(pg_get_serial_sequence('job_tickets_companyprofile', 'id'), COALESCE((SELECT MAX(id) FROM job_tickets_companyprofile), 1));")
+                                CompanyProfile.objects.create(
+                                    workspace=workspace,
+                                    company_name=company_name,
+                                    email=email,
+                                    phone1=phone or '',
+                                    tagline='Service & Repair Center',
+                                )
+                            else:
+                                raise cp_err
 
                     # 5. Seed default Financial Accounts
                     FinancialAccount.ensure_default_accounts(workspace)
@@ -224,13 +242,19 @@ def saas_register(request):
                     return redirect(f"{reverse('saas_register_pending')}?email={email}&slug={slug}")
 
             except Exception as e:
-                errors['general'] = f"Failed to register workspace: {str(e)}"
+                PlatformErrorLog.log_exception(e, request=request, module='saas_register', level=PlatformErrorLog.LEVEL_ERROR)
+                if getattr(settings, 'DEBUG', False):
+                    errors['general'] = f"Registration error: {str(e)}"
+                else:
+                    errors['general'] = "We encountered an issue creating your workspace. Our system administrators have been automatically notified. Please try again in a moment."
 
+    saas_root_domain = getattr(settings, 'SAAS_ROOT_DOMAIN', '') or 'anasrawuthar.in'
     context = {
         'saas_brand': SAAS_BRAND,
         'app_name': SAAS_BRAND['app_name'],
         'company_name': SAAS_BRAND['company_name'],
         'logo_url': SAAS_BRAND['logo_url'],
+        'saas_root_domain': saas_root_domain,
         'errors': errors,
         'form_data': form_data,
     }

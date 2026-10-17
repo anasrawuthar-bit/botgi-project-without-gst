@@ -149,12 +149,12 @@
                                 <label class="form-label fw-semibold small text-dark">Choose Your Subdomain Slug <span class="text-danger">*</span></label>
                                 <div class="input-group subdomain-input-group">
                                     <input type="text" name="subdomain" id="subdomain" class="form-control {% if errors.subdomain %}is-invalid{% endif %}" placeholder="metrolaptops" value="{{ form_data.subdomain }}" required pattern="[a-zA-Z0-9\-]+" style="text-transform: lowercase;">
-                                    <span class="input-group-text">.zyndesk.com</span>
+                                    <span class="input-group-text">.{{ saas_root_domain }}</span>
                                     {% if errors.subdomain %}
                                     <div class="invalid-feedback d-block">{{ errors.subdomain }}</div>
                                     {% endif %}
                                 </div>
-                                <div class="form-text small">Your staff will access the app at: <strong class="text-primary"><span id="previewText">yourcompany</span>.zyndesk.com</strong></div>
+                                <div class="form-text small">Your staff will access the app at: <strong class="text-primary"><span id="previewText">yourcompany</span>.{{ saas_root_domain }}</strong></div>
                             </div>
 
                             <h6 class="text-uppercase text-muted fw-bold mb-3 mt-4" style="font-size: 0.75rem; letter-spacing: 0.08em;">2. Owner Account Details</h6>

@@ -36,6 +36,22 @@ EOF
 if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
     echo "Applying database migrations..."
     python manage.py migrate --noinput
+    echo "Synchronizing database sequences..."
+    python -c "
+import os, django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'botgi_crm.settings')
+django.setup()
+from django.apps import apps
+from django.db import connection
+from django.core.management.color import no_style
+if connection.vendor == 'postgresql':
+    models = apps.get_models()
+    sql_list = connection.ops.sequence_reset_sql(no_style(), list(models))
+    with connection.cursor() as cursor:
+        for sql in sql_list:
+            cursor.execute(sql)
+    print('All database sequences synchronized successfully.')
+"
 fi
 
 # Collect static files if COLLECT_STATIC is true (default: true for web service)
