@@ -89,10 +89,18 @@ EMAIL_VERIFY_SALT = 'zyndesk-verify-email-v1'
 EMAIL_REJECT_SALT = 'zyndesk-reject-email-v1'
 
 
-def _get_root_domain_base_url():
-    """Return public base URL of the root domain."""
+def _get_root_domain_base_url(request=None):
+    """Return public base URL of the main platform website (e.g. https://zyndesk.anasrawuthar.in)."""
+    if request:
+        try:
+            return request.build_absolute_uri('/').rstrip('/')
+        except Exception:
+            pass
+    public_url = getattr(settings, 'PUBLIC_BASE_URL', '')
+    if public_url:
+        return public_url.rstrip('/')
     root_domain = getattr(settings, 'SAAS_ROOT_DOMAIN', '') or 'anasrawuthar.in'
-    return f"https://{root_domain}".rstrip('/')
+    return f"https://zyndesk.{root_domain}".rstrip('/')
 
 
 def generate_email_verification_token(workspace, user):
@@ -190,7 +198,7 @@ def send_registration_verification_email(user, workspace, request=None):
     reject_token = generate_email_rejection_token(workspace, user)
 
     root_domain = getattr(settings, 'SAAS_ROOT_DOMAIN', '') or 'anasrawuthar.in'
-    root_base_url = _get_root_domain_base_url()
+    root_base_url = _get_root_domain_base_url(request=request)
 
     verify_url = f"{root_base_url}{reverse('saas_verify_email')}?token={token}"
     reject_url = f"{root_base_url}{reverse('saas_reject_registration')}?token={reject_token}"
