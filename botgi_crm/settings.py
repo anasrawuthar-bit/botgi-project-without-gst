@@ -72,7 +72,7 @@ SECURE_SSL_REDIRECT = (
     if RUNNING_TESTS
     else env.bool('DJANGO_SECURE_SSL_REDIRECT', default=False)
 )
-PUBLIC_BASE_URL = '' if RUNNING_TESTS else env('PUBLIC_BASE_URL', default='https://anasrawuthar.in')
+PUBLIC_BASE_URL = '' if RUNNING_TESTS else env('PUBLIC_BASE_URL', default='https://zyndesk.anasrawuthar.in')
 SAAS_ROOT_DOMAIN = env('SAAS_ROOT_DOMAIN', default='anasrawuthar.in')
 WEB_RELEASE_VERSION = env('WEB_RELEASE_VERSION', default='dev')
 WEB_RELEASE_POLL_INTERVAL_SECONDS = env.int('WEB_RELEASE_POLL_INTERVAL_SECONDS', default=300)
