@@ -30,12 +30,12 @@ RUN pip install --no-cache-dir --upgrade pip
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code first
+# Copy application code
 COPY . /app/
 
-# Ensure the entrypoint remains executable after the application copy.
-# Use an absolute path and preserve the existing Bash shebang in entrypoint.sh.
-RUN chmod 755 /app/entrypoint.sh && \
+# Ensure the entrypoint has Unix line endings (CRLF -> LF) and remains executable
+RUN sed -i 's/\r$//' /app/entrypoint.sh && \
+    chmod 755 /app/entrypoint.sh && \
     mkdir -p /app/media /app/staticfiles
 
 # Expose default application port

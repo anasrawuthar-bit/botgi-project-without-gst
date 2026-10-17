@@ -244,31 +244,25 @@ CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=False)
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-database_url = env('DATABASE_URL', default='postgres://postgres:1234@127.0.0.1:5432/zyndesk')
+db_url = env('DATABASE_URL', default='')
+if not db_url:
+    postgres_host = env('POSTGRES_HOST', default=env('DB_HOST', default='127.0.0.1'))
+    postgres_port = env('POSTGRES_PORT', default=env('DB_PORT', default='5432'))
+    postgres_db = env('POSTGRES_DB', default=env('DB_NAME', default='zyndesk'))
+    postgres_user = env('POSTGRES_USER', default=env('DB_USER', default='postgres'))
+    postgres_password = env('POSTGRES_PASSWORD', default=env('DB_PASSWORD', default='1234'))
+    db_url = f'postgres://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_db}'
 
-if database_url:
-    DATABASES = {
-        'default': {
-            **env.db('DATABASE_URL', default=database_url),
-            'CONN_MAX_AGE': 0 if (DEBUG or RUNNING_TESTS) else 600,
-            'OPTIONS': {
-                'connect_timeout': 10,
-                'options': '-c default_transaction_isolation=read\\ committed -c statement_timeout=30000',
-            },
+DATABASES = {
+    'default': {
+        **env.db_url_config(db_url),
+        'CONN_MAX_AGE': 0 if (DEBUG or RUNNING_TESTS) else 600,
+        'OPTIONS': {
+            'connect_timeout': 10,
+            'options': '-c default_transaction_isolation=read\\ committed -c statement_timeout=30000',
         },
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'zyndesk',
-            'USER': 'postgres',
-            'PASSWORD': '1234',
-            'HOST': '127.0.0.1',
-            'PORT': '5432',
-            'CONN_MAX_AGE': 0 if (DEBUG or RUNNING_TESTS) else 600,
-        }
-    }
+    },
+}
 
 
 
