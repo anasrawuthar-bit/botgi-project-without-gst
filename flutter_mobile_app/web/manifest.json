@@ -1,11 +1,11 @@
 {
-    "name": "Botgi Technician",
-    "short_name": "Botgi Tech",
+    "name": "ZynDesk",
+    "short_name": "ZynDesk",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "Botgi Technician Mobile App by GIHostings",
+    "description": "ZynDesk Mobile App — Every Service. One Desk",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

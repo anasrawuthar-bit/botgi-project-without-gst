@@ -1,0 +1,42 @@
+# ==============================================================================
+# CADDY CONFIGURATION FOR BOTGI SAAS PLATFORM
+# Replace 'mycompany.in' with your real production domain.
+# ==============================================================================
+
+{
+    # Enable On-Demand TLS for custom company domains (optional)
+    # on_demand_tls {
+    #     ask http://web:8000/api/check-custom-domain/
+    # }
+    email admin@mycompany.in
+}
+
+# ------------------------------------------------------------------------------
+# Root Domain & Wildcard Subdomains (*.mycompany.in)
+# ------------------------------------------------------------------------------
+*.mycompany.in, mycompany.in {
+    # Enable gzip & zstd compression
+    encode gzip zstd
+
+    # Serve static assets directly from shared volume for max speed
+    handle_path /static/* {
+        root * /var/www/static
+        file_server
+    }
+
+    # Serve uploaded media files directly
+    handle_path /media/* {
+        root * /var/www/media
+        file_server
+    }
+
+    # Reverse proxy all web & WebSocket traffic to Daphne ASGI container
+    handle {
+        reverse_proxy web:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}

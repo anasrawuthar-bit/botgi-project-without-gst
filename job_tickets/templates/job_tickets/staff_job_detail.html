@@ -179,6 +179,31 @@
             <a href="{% url 'job_billing_print_view' job.job_code %}" target="_blank" rel="noopener" class="btn btn-outline-dark btn-sm">
                 <i class="fas fa-file-invoice me-1"></i> Print Invoice
             </a>
+            <div class="dropdown">
+                <button class="btn btn-outline-info btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                    <i class="fas fa-envelope me-1"></i> Email Customer
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                    <li>
+                        <form method="POST" action="{% url 'staff_send_job_email' job.job_code %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="email_type" value="intake_receipt">
+                            <button type="submit" class="dropdown-item">
+                                <i class="fas fa-id-card me-2 text-primary"></i> Email Intake Receipt
+                            </button>
+                        </form>
+                    </li>
+                    <li>
+                        <form method="POST" action="{% url 'staff_send_job_email' job.job_code %}">
+                            {% csrf_token %}
+                            <input type="hidden" name="email_type" value="invoice">
+                            <button type="submit" class="dropdown-item">
+                                <i class="fas fa-file-invoice me-2 text-success"></i> Email Tax Invoice / Bill
+                            </button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
             {% if job.status != 'Closed' %}
             <a href="{% url 'job_billing_staff' job.job_code %}" class="btn btn-primary btn-sm">
                 <i class="fas fa-calculator me-1"></i> Manage Bill

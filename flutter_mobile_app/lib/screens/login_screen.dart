@@ -454,7 +454,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                               mainAxisAlignment: MainAxisAlignment.center,
                                               children: [
                                                 Text(
-                                                  'Sign In to Workshop',
+                                                  'Sign In to ZynDesk',
                                                   style: TextStyle(
                                                     fontSize: 15,
                                                     fontWeight: FontWeight.w700,
@@ -551,7 +551,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            'Botgi Technician • Powered by GIHostings • v1.0.0',
+                            'ZynDesk • Every Service. One Desk • v1.0.1',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.grey.shade500,
@@ -606,7 +606,7 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
         const SizedBox(height: 14),
         const Text(
-          'BOTGI TECHNICIAN',
+          'ZYNDESK',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w900,
@@ -622,7 +622,7 @@ class _LoginScreenState extends State<LoginScreen> {
             borderRadius: BorderRadius.circular(12),
           ),
           child: const Text(
-            'Powered by GIHostings',
+            'Every Service. One Desk',
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
@@ -651,7 +651,7 @@ class _ServerSettingsSheetState extends State<_ServerSettingsSheet> {
   void initState() {
     super.initState();
     // Do NOT pre-fill with any default domain
-    _hostPortController = TextEditingController(text: AppConfig.customBaseUrl);
+    _hostPortController = TextEditingController(text: "");
   }
 
   @override
@@ -754,7 +754,7 @@ class _ServerSettingsSheetState extends State<_ServerSettingsSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              'Enter the custom Botgi backend host and port for this device:',
+              'Enter the custom ZynDesk backend host or domain for this device:',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
             ),
             if (_sheetError != null) ...[
@@ -772,8 +772,8 @@ class _ServerSettingsSheetState extends State<_ServerSettingsSheet> {
             TextField(
               controller: _hostPortController,
               decoration: InputDecoration(
-                labelText: 'Custom Host / Port',
-                hintText: 'e.g. 192.168.1.6:8000 or http://192.168.1.6:8000',
+                labelText: 'Server Host / Domain',
+                hintText: 'e.g. company.zyndesk.com or 192.168.1.6:8000',
                 prefixIcon: const Icon(Icons.settings_ethernet_rounded),
                 suffixIcon: _hostPortController.text.isNotEmpty
                     ? IconButton(

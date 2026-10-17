@@ -1422,8 +1422,8 @@ except admin.sites.NotRegistered:
 admin.site.register(User, SecureUserAdmin)
 admin.site.register(Group, SecureGroupAdmin)
 
-admin.site.site_header = "GI Hostings | Service Billing Administration"
-admin.site.site_title = "GI Hostings Admin"
+admin.site.site_header = "ZynDesk | Service Billing Administration"
+admin.site.site_title = "ZynDesk Admin"
 admin.site.index_title = "Operations Control Panel"
 admin.site.site_url = "/"
 admin.site.disable_action('delete_selected')

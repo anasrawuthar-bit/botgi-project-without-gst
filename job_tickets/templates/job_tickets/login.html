@@ -72,21 +72,20 @@
             <h1 class="text-center mb-4">
                 <i class="fas fa-user-lock"></i> Staff & Technician Login
             </h1>
-            {% if logout_notice %}
-                <div class="session-kick-banner d-flex align-items-start gap-3 mb-3" role="alert">
-                    <i class="fas fa-triangle-exclamation mt-1"></i>
+
+            {% if request.GET.verified %}
+                <div class="alert alert-success d-flex align-items-center mb-3" role="alert">
+                    <i class="fa-solid fa-circle-check me-2 fs-5 text-success"></i>
                     <div>
-                        <strong>
-                            {% if logout_reason == 'session_replaced' %}
-                                Signed Out From Another Device
-                            {% elif logout_reason == 'session_expired' %}
-                                Session Expired
-                            {% else %}
-                                Notice
-                            {% endif %}
-                        </strong>
-                        <div class="small mt-1">{{ logout_notice }}</div>
+                        <strong>Email Verified!</strong> Your company workspace is now active. Please sign in below.
                     </div>
+                </div>
+            {% endif %}
+
+            {% if not current_workspace %}
+                <div class="alert alert-info py-2 px-3 small d-flex align-items-center justify-content-between mb-3 border-0 bg-primary bg-opacity-10 text-primary">
+                    <div><i class="fa-solid fa-compass me-1"></i> Looking for your company's dedicated portal?</div>
+                    <a href="{% url 'saas_find_domain' %}" class="fw-bold text-primary text-nowrap ms-2 text-decoration-underline">Find Domain</a>
                 </div>
             {% endif %}
             <form method="post" id="loginForm">
@@ -140,12 +139,19 @@
                 </div>
                 
                 {% if error %}
-                    <div class="alert alert-danger d-flex align-items-center" role="alert">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
-                        <div>
-                            {{ error }}
+                    <div class="alert {% if verification_pending %}alert-warning border-warning{% else %}alert-danger{% endif %} d-flex align-items-start" role="alert">
+                        <i class="fas {% if verification_pending %}fa-envelope-open-text text-warning mt-1{% else %}fa-exclamation-triangle mt-1{% endif %} me-2"></i>
+                        <div class="flex-grow-1">
+                            <div>{{ error }}</div>
+                            {% if verification_pending %}
+                                <div class="mt-2 pt-2 border-top border-warning border-opacity-50">
+                                    <a href="{% url 'saas_resend_verification' %}?email={{ pending_email }}" class="btn btn-sm btn-warning text-dark fw-bold">
+                                        <i class="fa-solid fa-paper-plane me-1"></i> Resend Verification Email
+                                    </a>
+                                </div>
+                            {% endif %}
                             {% if attempts_left and not locked %}
-                                <br><small>Attempts remaining: {{ attempts_left }}</small>
+                                <div class="small mt-1">Attempts remaining: {{ attempts_left }}</div>
                             {% endif %}
                         </div>
                     </div>

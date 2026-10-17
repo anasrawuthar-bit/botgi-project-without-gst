@@ -1,0 +1,1832 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super Admin Console — ZynDesk Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="icon" type="image/jpeg" href="{{ logo_url }}">
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-dark: #3730a3;
+            --secondary: #0f172a;
+            --surface: #ffffff;
+            --surface-muted: #f8fafc;
+            --border: #e2e8f0;
+            --text-dark: #0f172a;
+            --text-muted: #64748b;
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #f1f5f9;
+            color: var(--text-dark);
+            min-height: 100vh;
+        }
+
+        .stat-card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 22px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+        }
+
+        .stat-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+
+        .table-card {
+            background: #ffffff;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04);
+            overflow: hidden;
+        }
+
+        .nav-pills .nav-link {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.88rem;
+            padding: 10px 18px;
+            border-radius: 12px;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .nav-pills .nav-link:hover {
+            color: var(--primary);
+            background: #eef2ff;
+        }
+
+        .nav-pills .nav-link.active {
+            background: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+        }
+
+        .progress-meter {
+            height: 7px;
+            border-radius: 50px;
+            background: #e2e8f0;
+            overflow: hidden;
+        }
+
+        .config-card {
+            background: #ffffff;
+            border-radius: 18px;
+            border: 1px solid var(--border);
+            padding: 28px;
+            box-shadow: 0 4px 20px -4px rgba(0, 0, 0, 0.04);
+        }
+
+        .config-title {
+            font-weight: 700;
+            font-size: 1.15rem;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .plan-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 28px 24px;
+            position: relative;
+            transition: all 0.25s ease;
+        }
+
+        .plan-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 12px 30px -8px rgba(79, 70, 229, 0.15);
+            transform: translateY(-3px);
+        }
+
+        .plan-card.popular {
+            border: 2px solid var(--primary);
+            box-shadow: 0 10px 30px -5px rgba(79, 70, 229, 0.2);
+        }
+
+        .plan-badge {
+            position: absolute;
+            top: -12px;
+            right: 20px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: #fff;
+            font-size: 0.72rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 50px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Platform Header -->
+    <header class="bg-white border-bottom sticky-top py-3 shadow-sm">
+        <div class="container-fluid px-4 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-3">
+                <img src="{{ logo_url }}" alt="Logo" style="height: 42px; border-radius: 8px;">
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="fw-bold fs-4 text-dark lh-1">ZynDesk</span>
+                        <span class="badge bg-dark text-white text-uppercase px-2 py-1" style="font-size: 0.65rem; letter-spacing: 0.08em;">
+                            <i class="fa-solid fa-shield-halved text-warning me-1"></i> Super Admin
+                        </span>
+                    </div>
+                    <small class="text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">PLATFORM INFRASTRUCTURE CONSOLE</small>
+                </div>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted small d-none d-md-inline">Logged in as: <strong>{{ request.user.email|default:request.user.username }}</strong></span>
+                <a href="/admin/" target="_blank" class="btn btn-outline-secondary btn-sm fw-semibold">
+                    <i class="fa-solid fa-database me-1"></i> Django Admin
+                </a>
+                <a href="{% url 'platform_admin_logout' %}" class="btn btn-outline-danger btn-sm fw-semibold">
+                    <i class="fa-solid fa-right-from-bracket me-1"></i> Log Out
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Impersonation Notice if active -->
+    {% if impersonating_ws %}
+    <div class="bg-warning text-dark py-2 px-4 shadow-sm border-bottom">
+        <div class="container-fluid d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2 fw-semibold">
+                <i class="fa-solid fa-triangle-exclamation fs-5"></i>
+                <span>Currently viewing company workspace: <strong>{{ impersonating_ws.name }}</strong> (<code>{{ impersonating_ws.slug }}</code>)</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'staff_dashboard' %}" class="btn btn-dark btn-sm fw-bold">Open Tenant Workspace</a>
+                <a href="{% url 'exit_impersonation' %}" class="btn btn-outline-dark btn-sm fw-bold">Exit Company View</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Main Container -->
+    <div class="container-fluid px-4 py-4">
+
+        <!-- Flash messages -->
+        {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show border-0 shadow-sm" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- High Level KPIs -->
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Companies</span>
+                        <div class="stat-icon bg-primary-subtle text-primary"><i class="fa-solid fa-building"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0">{{ total_companies }}</h3>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Active Trials</span>
+                        <div class="stat-icon bg-warning-subtle text-warning"><i class="fa-solid fa-hourglass-half"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-warning">{{ active_trials }}</h3>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Paid Accounts</span>
+                        <div class="stat-icon bg-success-subtle text-success"><i class="fa-solid fa-circle-check"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-success">{{ active_paid }}</h3>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Total Revenue</span>
+                        <div class="stat-icon bg-success-subtle text-success"><i class="fa-solid fa-indian-rupee-sign"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0 text-dark">₹{{ total_revenue|floatformat:2 }}</h3>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Platform Storage</span>
+                        <div class="stat-icon bg-info-subtle text-info"><i class="fa-solid fa-hard-drive"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0">{{ total_storage_mb }} <span class="fs-6 text-muted fw-normal">MB</span></h3>
+                </div>
+            </div>
+
+            <div class="col-sm-6 col-xl-2">
+                <div class="stat-card">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="text-muted small fw-semibold">Platform Tickets</span>
+                        <div class="stat-icon bg-purple-subtle text-purple" style="background: #faf5ff; color: #7c3aed;"><i class="fa-solid fa-ticket"></i></div>
+                    </div>
+                    <h3 class="fw-bold mb-0">{{ total_tickets }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- Master Navigation Pills -->
+        <div class="bg-white p-2 rounded-4 border mb-4 shadow-sm">
+            <ul class="nav nav-pills gap-1 overflow-x-auto flex-nowrap" id="platformTabs" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link active" id="tab-companies-btn" data-bs-toggle="pill" data-bs-target="#tab-companies" type="button">
+                        <i class="fa-solid fa-building me-1"></i> Companies <span class="badge bg-white text-primary ms-1">{{ total_companies }}</span>
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-plans-btn" data-bs-toggle="pill" data-bs-target="#tab-plans" type="button">
+                        <i class="fa-solid fa-layer-group me-1"></i> Plan Management
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-payments-btn" data-bs-toggle="pill" data-bs-target="#tab-payments" type="button">
+                        <i class="fa-solid fa-credit-card me-1"></i> Payments & Gateway
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-smtp-btn" data-bs-toggle="pill" data-bs-target="#tab-smtp" type="button">
+                        <i class="fa-solid fa-envelope me-1"></i> SMTP Configuration
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-email-verification-btn" data-bs-toggle="pill" data-bs-target="#tab-email-verification" type="button">
+                        <i class="fa-solid fa-envelope-circle-check me-1"></i> Email Verification
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-whatsapp-btn" data-bs-toggle="pill" data-bs-target="#tab-whatsapp" type="button">
+                        <i class="fa-brands fa-whatsapp me-1 text-success"></i> WhatsApp Config
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-otp-btn" data-bs-toggle="pill" data-bs-target="#tab-otp" type="button">
+                        <i class="fa-solid fa-key me-1 text-warning"></i> OTP Config
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-users-btn" data-bs-toggle="pill" data-bs-target="#tab-users" type="button">
+                        <i class="fa-solid fa-users me-1"></i> Users & Storage
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-activity-btn" data-bs-toggle="pill" data-bs-target="#tab-activity" type="button">
+                        <i class="fa-solid fa-list-check me-1"></i> Activity Logs
+                    </button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" id="tab-errors-btn" data-bs-toggle="pill" data-bs-target="#tab-errors" type="button">
+                        <i class="fa-solid fa-triangle-exclamation me-1 text-danger"></i> Error Management
+                        {% if unresolved_error_logs > 0 %}<span class="badge bg-danger ms-1">{{ unresolved_error_logs }}</span>{% endif %}
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Tab Contents -->
+        <div class="tab-content" id="platformTabsContent">
+
+            <!-- ============================================================= -->
+            <!-- TAB 1: COMPANIES                                              -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade show active" id="tab-companies" role="tabpanel">
+                <div class="table-card">
+                    <div class="p-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h5 class="fw-bold mb-1">Company Workspaces</h5>
+                            <p class="text-secondary small mb-0">Each company has its own isolated subdomain, staff, technicians, and database records.</p>
+                        </div>
+                        <a href="{% url 'saas_register' %}" target="_blank" class="btn btn-primary btn-sm fw-bold px-3">
+                            <i class="fa-solid fa-plus me-1"></i> Register New Company
+                        </a>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Company / Subdomain</th>
+                                    <th>Owner</th>
+                                    <th>Status & Expiry</th>
+                                    <th>Storage Usage</th>
+                                    <th>Limits (Jobs/Staff)</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in workspaces %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark fs-6">{{ item.obj.name }}</div>
+                                        <div class="d-flex align-items-center gap-1 mt-1">
+                                            <span class="badge bg-light text-primary border font-monospace">{{ item.obj.slug }}.zyndesk.com</span>
+                                            {% if item.obj.custom_domain %}
+                                            <span class="badge bg-secondary font-monospace" title="Custom Domain">{{ item.obj.custom_domain }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="small fw-semibold text-dark">{{ item.obj.owner.username }}</div>
+                                        <div class="small text-muted">{{ item.obj.contact_email|default:item.obj.owner.email }}</div>
+                                        <div class="small text-muted">{{ item.obj.contact_phone|default:"—" }}</div>
+                                    </td>
+                                    <td>
+                                        {% if item.obj.status == 'trial' %}
+                                            {% if item.is_expired %}
+                                            <span class="badge bg-danger"><i class="fa-solid fa-hourglass-end me-1"></i>Trial Expired</span>
+                                            {% else %}
+                                            <span class="badge bg-warning text-dark"><i class="fa-solid fa-clock me-1"></i>Trial: {{ item.days_left }}d left</span>
+                                            {% endif %}
+                                        {% elif item.obj.status == 'active' %}
+                                            {% if item.is_expired %}
+                                            <span class="badge bg-danger"><i class="fa-solid fa-triangle-exclamation me-1"></i>Plan Expired</span>
+                                            {% else %}
+                                            <span class="badge bg-success"><i class="fa-solid fa-circle-check me-1"></i>Active ({{ item.days_left }}d left)</span>
+                                            {% endif %}
+                                        {% elif item.obj.status == 'suspended' %}
+                                            <span class="badge bg-dark"><i class="fa-solid fa-ban me-1"></i>Suspended</span>
+                                        {% endif %}
+
+                                        <div class="small text-dark fw-semibold mt-1">Plan: <span class="badge bg-primary-subtle text-primary border">{{ item.obj.plan_name }}</span></div>
+                                        <div class="small text-muted font-monospace" style="font-size: 0.72rem;">
+                                            Expires: {{ item.expiry_date|date:"d M Y"|default:"Never" }}
+                                        </div>
+                                    </td>
+                                    <td style="min-width: 160px;">
+                                        <div class="d-flex align-items-center justify-content-between small mb-1">
+                                            <span class="fw-semibold">{{ item.storage_used_mb }} MB</span>
+                                            <span class="text-muted">{{ item.storage_limit_mb }} MB</span>
+                                        </div>
+                                        <div class="progress-meter">
+                                            <div class="progress-bar {% if item.storage_percent > 90 %}bg-danger{% elif item.storage_percent > 70 %}bg-warning{% else %}bg-primary{% endif %}" 
+                                                 role="progressbar" 
+                                                 style="width: {{ item.storage_percent }}%;">
+                                            </div>
+                                        </div>
+                                        <div class="text-end text-muted font-monospace" style="font-size: 0.7rem;">{{ item.storage_percent }}%</div>
+                                    </td>
+                                    <td>
+                                        <div class="small">Jobs: <strong>{{ item.monthly_tickets }}</strong> / {{ item.obj.max_tickets_per_month }}</div>
+                                        <div class="small text-muted">Staff: <strong>{{ item.staff_count }}</strong> / {{ item.obj.max_staff_limit }}</div>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-primary btn-sm fw-bold" onclick="openExtendPlanModal('{{ item.obj.id }}', '{{ item.obj.name|escapejs }}', '{{ item.obj.plan_name|escapejs }}', '{{ item.expiry_date|date:'Y-m-d'|default:'' }}')">
+                                                <i class="fa-solid fa-calendar-plus me-1"></i> Extend Plan
+                                            </button>
+                                            <button class="btn btn-light btn-sm border dropdown-toggle" type="button" data-bs-toggle="dropdown"></button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow-sm">
+                                                <li>
+                                                    <form method="POST" action="{% url 'platform_admin_action' item.obj.id %}">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="action" value="impersonate">
+                                                        <button type="submit" class="dropdown-item text-primary fw-semibold">
+                                                            <i class="fa-solid fa-arrow-right-to-bracket me-2"></i> Log In as Company
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                <li><hr class="dropdown-divider"></li>
+                                                {% if item.obj.status == 'suspended' %}
+                                                <li>
+                                                    <form method="POST" action="{% url 'platform_admin_action' item.obj.id %}">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="action" value="unsuspend">
+                                                        <button type="submit" class="dropdown-item text-success">
+                                                            <i class="fa-solid fa-unlock me-2"></i> Reactivate Company
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                {% else %}
+                                                <li>
+                                                    <form method="POST" action="{% url 'platform_admin_action' item.obj.id %}" onsubmit="return confirm('Are you sure you want to suspend access to {{ item.obj.name }}?');">
+                                                        {% csrf_token %}
+                                                        <input type="hidden" name="action" value="suspend">
+                                                        <button type="submit" class="dropdown-item text-danger">
+                                                            <i class="fa-solid fa-ban me-2"></i> Suspend Access
+                                                        </button>
+                                                    </form>
+                                                </li>
+                                                {% endif %}
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        No companies registered yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 2: PLAN MANAGEMENT                                        -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-plans" role="tabpanel">
+                <div class="d-flex align-items-center justify-content-between mb-4">
+                    <div>
+                        <h4 class="fw-bold mb-1">SaaS Subscription Plans</h4>
+                        <p class="text-secondary small mb-0">Configure plan pricing, staff quotas, ticket limits, and feature lists for companies.</p>
+                    </div>
+                    <button class="btn btn-primary btn-sm fw-bold px-3" data-bs-toggle="modal" data-bs-target="#createPlanModal">
+                        <i class="fa-solid fa-plus me-1"></i> Create New Plan
+                    </button>
+                </div>
+
+                <div class="row g-4">
+                    {% for plan in plans %}
+                    <div class="col-md-6 col-xl-3">
+                        <div class="plan-card {% if plan.is_popular %}popular{% endif %} h-100 d-flex flex-column justify-content-between">
+                            {% if plan.is_popular %}
+                            <div class="plan-badge">Popular Choice</div>
+                            {% endif %}
+                            <div>
+                                <div class="d-flex align-items-center justify-content-between mb-2">
+                                    <h5 class="fw-bold mb-0">{{ plan.name }}</h5>
+                                    {% if plan.is_active %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary-subtle text-secondary">Inactive</span>
+                                    {% endif %}
+                                </div>
+                                <div class="mb-3">
+                                    <span class="fs-2 fw-bold text-dark">₹{{ plan.price|floatformat:0 }}</span>
+                                    <span class="text-muted small">/ {{ plan.get_billing_interval_display }}</span>
+                                </div>
+
+                                <ul class="list-unstyled small mb-4">
+                                    <li class="py-1"><i class="fa-solid fa-users text-primary me-2"></i>Up to <strong>{{ plan.max_staff }}</strong> Staff / Techs</li>
+                                    <li class="py-1"><i class="fa-solid fa-ticket text-primary me-2"></i><strong>{{ plan.max_tickets_per_month }}</strong> Jobs / Month</li>
+                                    <li class="py-1"><i class="fa-solid fa-hard-drive text-primary me-2"></i><strong>{{ plan.storage_limit_mb }} MB</strong> Storage</li>
+                                    {% for feat in plan.features_list %}
+                                    <li class="py-1 text-secondary"><i class="fa-solid fa-check text-success me-2"></i>{{ feat }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+
+                            <div class="pt-3 border-top d-flex gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm flex-grow-1 fw-semibold" onclick="openEditPlanModal('{{ plan.id }}', '{{ plan.name|escapejs }}', '{{ plan.slug|escapejs }}', '{{ plan.price }}', '{{ plan.billing_interval }}', '{{ plan.max_staff }}', '{{ plan.max_tickets_per_month }}', '{{ plan.storage_limit_mb }}', '{{ plan.features_text|escapejs }}', {{ plan.is_active|yesno:'true,false' }}, {{ plan.is_popular|yesno:'true,false' }})">
+                                    <i class="fa-solid fa-pen-to-square me-1"></i> Edit Plan
+                                </button>
+                                <a href="{% url 'platform_admin_delete_plan' plan.id %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('Delete plan {{ plan.name }}?');">
+                                    <i class="fa-solid fa-trash"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 3: PAYMENTS & PAYMENT GATEWAY INTEGRATION                  -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-payments" role="tabpanel">
+                <div class="row g-4 mb-4">
+                    <!-- Payment Gateway Configuration Form -->
+                    <div class="col-lg-5">
+                        <div class="config-card h-100">
+                            <div class="config-title">
+                                <i class="fa-solid fa-wallet text-primary"></i> Payment Gateway Integration
+                            </div>
+                            <p class="text-secondary small mb-4">Configure online payment gateways (Razorpay, Stripe, Cashfree) and Merchant UPI QR for subscription billing.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_update_settings' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="section" value="payment">
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Primary Gateway Provider</label>
+                                    <select name="payment_gateway" class="form-select">
+                                        <option value="razorpay" {% if platform_settings.payment_gateway == 'razorpay' %}selected{% endif %}>Razorpay (Cards, UPI, Netbanking)</option>
+                                        <option value="stripe" {% if platform_settings.payment_gateway == 'stripe' %}selected{% endif %}>Stripe (Global Credit/Debit Cards)</option>
+                                        <option value="cashfree" {% if platform_settings.payment_gateway == 'cashfree' %}selected{% endif %}>Cashfree Payments</option>
+                                        <option value="upi_manual" {% if platform_settings.payment_gateway == 'upi_manual' %}selected{% endif %}>Direct UPI QR & Manual Bank Transfer</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Environment Mode</label>
+                                    <select name="payment_mode" class="form-select">
+                                        <option value="test" {% if platform_settings.payment_mode == 'test' %}selected{% endif %}>Sandbox / Test Mode</option>
+                                        <option value="live" {% if platform_settings.payment_mode == 'live' %}selected{% endif %}>Live / Production Mode</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Gateway Public Key / Key ID</label>
+                                    <input type="text" name="payment_key_id" class="form-control font-monospace small" value="{{ platform_settings.payment_key_id }}" placeholder="rzp_test_... or pk_test_...">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Gateway Key Secret</label>
+                                    <input type="password" name="payment_key_secret" class="form-control font-monospace small" placeholder="Leave blank to keep current secret">
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Webhook Secret</label>
+                                    <input type="text" name="payment_webhook_secret" class="form-control font-monospace small" value="{{ platform_settings.payment_webhook_secret }}">
+                                </div>
+
+                                <div class="row g-2 mb-3">
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">Currency</label>
+                                        <input type="text" name="payment_currency" class="form-control" value="{{ platform_settings.payment_currency|default:'INR' }}">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">Merchant UPI VPA</label>
+                                        <input type="text" name="payment_upi_id" class="form-control" value="{{ platform_settings.payment_upi_id }}" placeholder="zyndesk@upi">
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label small fw-bold">Direct UPI QR Code Image URL</label>
+                                    <input type="url" name="payment_qr_image_url" class="form-control small" value="{{ platform_settings.payment_qr_image_url }}" placeholder="https://example.com/upi-qr.png">
+                                </div>
+
+                                <button type="submit" class="btn btn-primary w-100 fw-bold">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> Save Payment Gateway Settings
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Subscription Payment Records Table -->
+                    <div class="col-lg-7">
+                        <div class="table-card h-100">
+                            <div class="p-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                <div>
+                                    <h5 class="fw-bold mb-1">Subscription Payment Records</h5>
+                                    <p class="text-secondary small mb-0">Record and review subscription fees received from companies into ZynDesk.</p>
+                                </div>
+                                <button type="button" class="btn btn-success btn-sm fw-bold px-3" data-bs-toggle="modal" data-bs-target="#recordPaymentModal">
+                                    <i class="fa-solid fa-plus me-1"></i> Record Payment
+                                </button>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Company</th>
+                                            <th>Amount</th>
+                                            <th>Plan</th>
+                                            <th>Method & Ref / UTR</th>
+                                            <th>Coverage Period</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for p in payments %}
+                                        <tr>
+                                            <td>
+                                                <div class="fw-semibold small">{{ p.paid_at|date:"M d, Y" }}</div>
+                                                <div class="small text-muted">{{ p.paid_at|time:"H:i" }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-bold text-dark small">{{ p.workspace.name }}</div>
+                                                <div class="small text-muted font-monospace">{{ p.workspace.slug }}.zyndesk.com</div>
+                                            </td>
+                                            <td>
+                                                <span class="fw-bold text-success">₹{{ p.amount|floatformat:2 }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-primary-subtle text-primary border">{{ p.plan_name }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-light text-dark border">{{ p.payment_method }}</span>
+                                                {% if p.reference_id %}
+                                                <div class="small text-muted font-monospace mt-1">{{ p.reference_id }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="small">{{ p.period_start|date:"M d" }} — {{ p.period_end|date:"M d, Y" }}</div>
+                                            </td>
+                                        </tr>
+                                        {% empty %}
+                                        <tr>
+                                            <td colspan="6" class="text-center py-5 text-muted">
+                                                No subscription payments recorded yet.
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 4: SMTP CONFIGURATION (Transactional Emails)              -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-smtp" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="config-card">
+                            <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+                                <div class="config-title mb-0">
+                                    <i class="fa-solid fa-server text-primary"></i> Platform SMTP Server Configuration
+                                </div>
+                                <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" id="btn-ping-smtp" onclick="checkLiveSmtpStatus()">
+                                    <i class="fa-solid fa-bolt me-1"></i> Check Live Status
+                                </button>
+                            </div>
+
+                            <!-- Live SMTP Status Banner -->
+                            <div class="p-3 rounded-3 mb-3 bg-light border d-flex align-items-center justify-content-between gap-2" id="smtp-status-box">
+                                <div class="d-flex align-items-center gap-3">
+                                    <span class="badge rounded-pill bg-success p-2" id="smtp-status-dot" style="width: 12px; height: 12px;"></span>
+                                    <div>
+                                        <div class="fw-bold small text-dark" id="smtp-status-title">
+                                            {% if platform_settings.smtp_host %}
+                                                Configured: <span class="font-monospace text-primary">{{ platform_settings.smtp_host }}:{{ platform_settings.smtp_port }}</span>
+                                                <span class="badge bg-secondary font-monospace ms-1">{% if platform_settings.smtp_use_ssl %}SSL{% elif platform_settings.smtp_use_tls %}TLS{% else %}Plain{% endif %}</span>
+                                            {% else %}
+                                                Not Configured
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-muted" style="font-size: 0.75rem;" id="smtp-status-sub">
+                                            Sender: <strong class="text-dark">{{ platform_settings.smtp_from_email|default:"None" }}</strong> • Outbound transactional relay active
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="badge bg-success-subtle text-success border border-success-subtle fw-semibold px-2 py-1" id="smtp-status-badge">
+                                    Ready
+                                </span>
+                            </div>
+
+                            <!-- Quick 1-Click Presets -->
+                            <div class="mb-3">
+                                <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">1-Click Provider Presets</label>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="applySmtpPreset('hostinger')">
+                                        <i class="fa-solid fa-server me-1 text-primary"></i> Hostinger (465 SSL)
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="applySmtpPreset('gmail')">
+                                        <i class="fa-brands fa-google me-1 text-danger"></i> Gmail (587 TLS)
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="applySmtpPreset('sendgrid')">
+                                        <i class="fa-solid fa-paper-plane me-1 text-info"></i> SendGrid (587 TLS)
+                                    </button>
+                                    <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="applySmtpPreset('ses')">
+                                        <i class="fa-brands fa-aws me-1 text-warning"></i> Amazon SES (587 TLS)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <form method="POST" action="{% url 'platform_admin_update_settings' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="section" value="smtp">
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-8">
+                                        <label class="form-label small fw-bold">SMTP Host Server <span class="text-danger">*</span></label>
+                                        <input type="text" id="smtp_host" name="smtp_host" class="form-control" value="{{ platform_settings.smtp_host }}" placeholder="e.g. smtp.hostinger.com" required>
+                                    </div>
+                                    <div class="col-sm-4">
+                                        <label class="form-label small fw-bold">Port <span class="text-danger">*</span></label>
+                                        <input type="number" id="smtp_port" name="smtp_port" class="form-control" value="{{ platform_settings.smtp_port|default:465 }}" oninput="autoSelectEncryptionByPort(this.value)" required>
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">SMTP Username / Email</label>
+                                        <input type="text" id="smtp_user" name="smtp_user" class="form-control" value="{{ platform_settings.smtp_user }}" placeholder="apikey or your-email@domain.com">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <label class="form-label small fw-bold mb-0">SMTP Password / App Secret</label>
+                                            {% if platform_settings.smtp_password %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle fw-normal" style="font-size: 0.68rem;">
+                                                <i class="fa-solid fa-circle-check me-1"></i>Saved in DB
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <input type="password" id="smtp_password" name="smtp_password" class="form-control" placeholder="Leave blank to keep existing password">
+                                    </div>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Default From Email Address</label>
+                                    <input type="email" id="smtp_from_email" name="smtp_from_email" class="form-control" value="{{ platform_settings.smtp_from_email }}" placeholder="notifications@zyndesk.com">
+                                </div>
+
+                                <!-- Encryption Mode Radio Selector (Guarantees Mutual Exclusivity) -->
+                                <div class="mb-4">
+                                    <label class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">Security & Encryption Mode</label>
+                                    <div class="d-flex flex-wrap gap-4 p-3 bg-light rounded-3 border">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="smtp_encryption_mode" id="enc_ssl" value="ssl" {% if platform_settings.smtp_use_ssl %}checked{% endif %} onchange="syncEncryptionMode('ssl')">
+                                            <label class="form-check-label small fw-semibold text-dark" for="enc_ssl">
+                                                <i class="fa-solid fa-shield-halved text-success me-1"></i> SSL / SMTPS <span class="text-muted fw-normal">(Port 465 — Hostinger, Direct SSL)</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="smtp_encryption_mode" id="enc_tls" value="tls" {% if platform_settings.smtp_use_tls and not platform_settings.smtp_use_ssl %}checked{% endif %} onchange="syncEncryptionMode('tls')">
+                                            <label class="form-check-label small fw-semibold text-dark" for="enc_tls">
+                                                <i class="fa-solid fa-lock text-primary me-1"></i> STARTTLS <span class="text-muted fw-normal">(Port 587 — Gmail, SendGrid, SES)</span>
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="smtp_encryption_mode" id="enc_none" value="none" {% if not platform_settings.smtp_use_ssl and not platform_settings.smtp_use_tls %}checked{% endif %} onchange="syncEncryptionMode('none')">
+                                            <label class="form-check-label small fw-semibold text-muted" for="enc_none">
+                                                Unencrypted <span class="text-muted fw-normal">(Port 25)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <!-- Underlying form values for Django -->
+                                    <input type="checkbox" name="smtp_use_ssl" id="smtp_use_ssl" {% if platform_settings.smtp_use_ssl %}checked{% endif %} style="display:none;">
+                                    <input type="checkbox" name="smtp_use_tls" id="smtp_use_tls" {% if platform_settings.smtp_use_tls and not platform_settings.smtp_use_ssl %}checked{% endif %} style="display:none;">
+                                </div>
+
+                                <button type="submit" class="btn btn-primary fw-bold px-4">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> Save SMTP Configuration
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Test Email Utility -->
+                    <div class="col-lg-5">
+                        <div class="config-card bg-light border-0">
+                            <div class="config-title">
+                                <i class="fa-solid fa-paper-plane text-success"></i> Test SMTP Dispatch
+                            </div>
+                            <p class="text-secondary small mb-3">Sends a verified test email through the active mail engine to confirm real inbox delivery.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_test_smtp' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Recipient Test Email</label>
+                                    <input type="email" name="test_email" class="form-control" value="{{ request.user.email }}" placeholder="you@domain.com" required>
+                                </div>
+                                <button type="submit" class="btn btn-success fw-bold w-100 py-2">
+                                    <i class="fa-solid fa-envelope me-1"></i> Send Live Test Email
+                                </button>
+                            </form>
+
+                            <div class="card p-3 border-0 bg-white shadow-sm rounded-3 mt-3">
+                                <div class="small fw-bold text-dark mb-1">
+                                    <i class="fa-solid fa-circle-question text-primary me-1"></i> Provider Quick Reference
+                                </div>
+                                <div class="small text-muted" style="font-size: 0.8rem; line-height: 1.4;">
+                                    <strong>Hostinger:</strong> <code>smtp.hostinger.com</code>, Port <code>465</code>, SSL enabled.<br>
+                                    <strong>Gmail:</strong> <code>smtp.gmail.com</code>, Port <code>587</code>, TLS enabled. Requires a 16-character Google App Password.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 5: EMAIL VERIFICATION SMTP CONFIGURATION                  -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-email-verification" role="tabpanel">
+                <div class="config-card" style="max-width: 820px;">
+                    <div class="config-title">
+                        <i class="fa-solid fa-envelope-circle-check text-primary"></i> Email Verification SMTP Configuration
+                    </div>
+                    <p class="text-secondary small mb-4">Manage account activation emails, email confirmation links, and dedicated verification credentials.</p>
+
+                    <form method="POST" action="{% url 'platform_admin_update_settings' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="section" value="email_verification">
+
+                        <div class="card p-3 bg-light border-0 rounded-3 mb-4">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="email_verification_enabled" id="email_verification_enabled" {% if platform_settings.email_verification_enabled %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="email_verification_enabled">Require Email Verification on Registration</label>
+                            </div>
+                            <div class="small text-muted ps-4">When enabled, newly registered companies must verify their email address before accessing the workspace.</div>
+                        </div>
+
+                        <div class="card p-3 bg-light border-0 rounded-3 mb-4">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" name="email_verification_use_custom_smtp" id="email_verification_use_custom_smtp" {% if platform_settings.email_verification_use_custom_smtp %}checked{% endif %} onchange="toggleCustomVerificationSmtp(this.checked)">
+                                <label class="form-check-label fw-bold" for="email_verification_use_custom_smtp">Use Dedicated Verification SMTP (Separate from Transactional SMTP)</label>
+                            </div>
+                            <div class="small text-muted ps-4">Useful if using a dedicated IP, high-deliverability pool, or Amazon SES specifically for verification tokens.</div>
+                        </div>
+
+                        <div id="customVerificationSmtpFields" style="{% if not platform_settings.email_verification_use_custom_smtp %}display: none;{% endif %}">
+                            <div class="row g-3 mb-3">
+                                <div class="col-sm-8">
+                                    <label class="form-label small fw-bold">Verification SMTP Host</label>
+                                    <input type="text" name="email_verification_smtp_host" class="form-control" value="{{ platform_settings.email_verification_smtp_host }}" placeholder="smtp.verification.domain.com">
+                                </div>
+                                <div class="col-sm-4">
+                                    <label class="form-label small fw-bold">Port</label>
+                                    <input type="number" name="email_verification_smtp_port" class="form-control" value="{{ platform_settings.email_verification_smtp_port|default:587 }}">
+                                </div>
+                            </div>
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-bold">Username</label>
+                                    <input type="text" name="email_verification_smtp_user" class="form-control" value="{{ platform_settings.email_verification_smtp_user }}">
+                                </div>
+                                <div class="col-sm-6">
+                                    <label class="form-label small fw-bold">Password</label>
+                                    <input type="password" name="email_verification_smtp_password" class="form-control" placeholder="Leave blank to keep existing password">
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-4 mb-3">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" name="email_verification_smtp_use_tls" id="email_verification_smtp_use_tls" {% if platform_settings.email_verification_smtp_use_tls %}checked{% endif %}>
+                                    <label class="form-check-label small fw-semibold" for="email_verification_smtp_use_tls">Use TLS</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-sm-8">
+                                <label class="form-label small fw-bold">Sender Address (From Email)</label>
+                                <input type="email" name="email_verification_smtp_from_email" class="form-control" value="{{ platform_settings.email_verification_smtp_from_email|default:'verify@zyndesk.com' }}">
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label small fw-bold">Token Validity (Hours)</label>
+                                <input type="number" name="email_verification_token_expiry_hours" class="form-control" value="{{ platform_settings.email_verification_token_expiry_hours|default:24 }}">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary fw-bold px-4">
+                            <i class="fa-solid fa-floppy-disk me-1"></i> Save Email Verification Settings
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 6: WHATSAPP CONFIGURATION                                 -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-whatsapp" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="config-card">
+                            <div class="config-title">
+                                <i class="fa-brands fa-whatsapp text-success"></i> WhatsApp Global Delivery Gateway
+                            </div>
+                            <p class="text-secondary small mb-4">Configure the platform WhatsApp pipeline for ticket status notifications, invoices, and estimate approvals.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_update_settings' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="section" value="whatsapp">
+
+                                <div class="mb-4">
+                                    <label class="form-label small fw-bold">Delivery Provider Method</label>
+                                    <select name="whatsapp_provider" class="form-select" onchange="toggleWhatsAppProvider(this.value)">
+                                        <option value="bridge" {% if platform_settings.whatsapp_provider == 'bridge' %}selected{% endif %}>WhatsApp Local QR Bridge (Node.js/Baileys Web Client)</option>
+                                        <option value="meta_cloud" {% if platform_settings.whatsapp_provider == 'meta_cloud' %}selected{% endif %}>Official Meta WhatsApp Cloud API (Graph API)</option>
+                                        <option value="twilio" {% if platform_settings.whatsapp_provider == 'twilio' %}selected{% endif %}>Twilio WhatsApp API</option>
+                                    </select>
+                                </div>
+
+                                <!-- Local Bridge Settings -->
+                                <div id="waBridgeFields" style="{% if platform_settings.whatsapp_provider != 'bridge' %}display: none;{% endif %}">
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Bridge Service URL</label>
+                                        <input type="url" name="whatsapp_bridge_url" class="form-control font-monospace" value="{{ platform_settings.whatsapp_bridge_url|default:'http://localhost:3000' }}">
+                                        <div class="form-text small">Endpoint where the local Node.js whatsapp-bridge container is listening.</div>
+                                    </div>
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-bold">Client ID</label>
+                                            <input type="text" name="whatsapp_bridge_client_id" class="form-control" value="{{ platform_settings.whatsapp_bridge_client_id|default:'zyndesk_default' }}">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-bold">API Secret Key</label>
+                                            <input type="password" name="whatsapp_bridge_secret" class="form-control" placeholder="Leave blank to keep existing secret">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Meta Cloud API Settings -->
+                                <div id="waMetaFields" style="{% if platform_settings.whatsapp_provider != 'meta_cloud' %}display: none;{% endif %}">
+                                    <div class="row g-3 mb-3">
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-bold">Phone Number ID</label>
+                                            <input type="text" name="whatsapp_meta_phone_number_id" class="form-control font-monospace" value="{{ platform_settings.whatsapp_meta_phone_number_id }}">
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <label class="form-label small fw-bold">WhatsApp Business Account ID</label>
+                                            <input type="text" name="whatsapp_meta_business_account_id" class="form-control font-monospace" value="{{ platform_settings.whatsapp_meta_business_account_id }}">
+                                        </div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Permanent System Access Token</label>
+                                        <textarea name="whatsapp_meta_access_token" rows="3" class="form-control font-monospace small" placeholder="EAAB... Leave blank to keep existing token"></textarea>
+                                    </div>
+                                </div>
+
+                                <div class="mb-4">
+                                    <label class="form-label small fw-bold">Default Country Calling Code</label>
+                                    <input type="text" name="whatsapp_default_country_code" class="form-control" style="max-width: 140px;" value="{{ platform_settings.whatsapp_default_country_code|default:'+91' }}">
+                                </div>
+
+                                <button type="submit" class="btn btn-primary fw-bold px-4">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> Save WhatsApp Configuration
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Test WhatsApp -->
+                    <div class="col-lg-5">
+                        <div class="config-card bg-light border-0">
+                            <div class="config-title">
+                                <i class="fa-solid fa-mobile-screen-button text-success"></i> Test WhatsApp Connectivity
+                            </div>
+                            <p class="text-secondary small mb-3">Ping provider endpoint and test message delivery to verify gateway health.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_test_whatsapp' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Recipient Mobile Number</label>
+                                    <input type="text" name="test_phone" class="form-control" placeholder="+91 9876543210" required>
+                                </div>
+                                <button type="submit" class="btn btn-success fw-bold w-100">
+                                    <i class="fa-brands fa-whatsapp me-1"></i> Ping & Test WhatsApp
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 7: OTP CONFIGURATION                                      -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-otp" role="tabpanel">
+                <div class="row g-4">
+                    <div class="col-lg-7">
+                        <div class="config-card">
+                            <div class="config-title">
+                                <i class="fa-solid fa-key text-warning"></i> OTP & SMS Gateway Configuration
+                            </div>
+                            <p class="text-secondary small mb-4">Set up SMS gateways (Fast2SMS, MSG91, Twilio) or Email-based OTP for login & ticket verifications.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_update_settings' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="section" value="otp">
+
+                                <div class="form-check form-switch mb-3">
+                                    <input class="form-check-input" type="checkbox" name="otp_enabled" id="otp_enabled" {% if platform_settings.otp_enabled %}checked{% endif %}>
+                                    <label class="form-check-label fw-bold small" for="otp_enabled">Enable Platform OTP Verification</label>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">OTP Service Provider</label>
+                                    <select name="otp_provider" class="form-select">
+                                        <option value="fast2sms" {% if platform_settings.otp_provider == 'fast2sms' %}selected{% endif %}>Fast2SMS (Quick SMS Gateway in India)</option>
+                                        <option value="msg91" {% if platform_settings.otp_provider == 'msg91' %}selected{% endif %}>MSG91 Enterprise SMS</option>
+                                        <option value="twilio" {% if platform_settings.otp_provider == 'twilio' %}selected{% endif %}>Twilio SMS API (Global)</option>
+                                        <option value="email" {% if platform_settings.otp_provider == 'email' %}selected{% endif %}>Email-Based OTP (Uses SMTP)</option>
+                                    </select>
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">API Key / Auth Token</label>
+                                    <input type="password" name="otp_api_key" class="form-control font-monospace" placeholder="Leave blank to keep existing key">
+                                </div>
+
+                                <div class="row g-3 mb-3">
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">Sender ID / DLT Header</label>
+                                        <input type="text" name="otp_sender_id" class="form-control" value="{{ platform_settings.otp_sender_id }}" placeholder="e.g. ZYNDSK">
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">DLT Template ID</label>
+                                        <input type="text" name="otp_template_id" class="form-control" value="{{ platform_settings.otp_template_id }}" placeholder="e.g. 12071617...">
+                                    </div>
+                                </div>
+
+                                <div class="row g-3 mb-4">
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">OTP Length</label>
+                                        <select name="otp_length" class="form-select">
+                                            <option value="6" {% if platform_settings.otp_length == 6 %}selected{% endif %}>6 Digits (Recommended)</option>
+                                            <option value="4" {% if platform_settings.otp_length == 4 %}selected{% endif %}>4 Digits</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <label class="form-label small fw-bold">Expiry Duration (Minutes)</label>
+                                        <input type="number" name="otp_expiry_minutes" class="form-control" value="{{ platform_settings.otp_expiry_minutes|default:10 }}">
+                                    </div>
+                                </div>
+
+                                <button type="submit" class="btn btn-primary fw-bold px-4">
+                                    <i class="fa-solid fa-floppy-disk me-1"></i> Save OTP Configuration
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- Test OTP -->
+                    <div class="col-lg-5">
+                        <div class="config-card bg-light border-0">
+                            <div class="config-title">
+                                <i class="fa-solid fa-comment-sms text-warning"></i> Test OTP Dispatch
+                            </div>
+                            <p class="text-secondary small mb-3">Dispatch a live test one-time password to verify SMS gateway routing and DLT header delivery.</p>
+
+                            <form method="POST" action="{% url 'platform_admin_test_otp' %}">
+                                {% csrf_token %}
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">Test Phone Number</label>
+                                    <input type="text" name="test_phone" class="form-control" placeholder="+91 9876543210" required>
+                                </div>
+                                <button type="submit" class="btn btn-warning fw-bold text-dark w-100">
+                                    <i class="fa-solid fa-key me-1"></i> Generate & Dispatch Test OTP
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 8: USERS & STORAGE                                        -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-users" role="tabpanel">
+                <div class="table-card mb-4">
+                    <div class="p-4 border-bottom">
+                        <h5 class="fw-bold mb-1">Cross-Company User Roster</h5>
+                        <p class="text-secondary small mb-0">List of all staff and technician accounts across all company workspaces.</p>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Company Workspace</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Date Joined</th>
+                                    <th>Last Login</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for u in platform_users %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ u.user.username }}</div>
+                                        <div class="small text-muted">{{ u.user.email|default:"No email" }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="fw-semibold">{{ u.workspace.name }}</div>
+                                        <div class="small text-muted font-monospace">{{ u.workspace.slug }}.zyndesk.com</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ u.role }}</span>
+                                    </td>
+                                    <td>
+                                        {% if u.is_active %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                        {% else %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="small">{{ u.date_joined|date:"M d, Y" }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="small text-muted">{{ u.last_login|date:"M d, Y H:i"|default:"Never" }}</div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        No users found.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 9: ACTIVITY & AUDIT LOGS                                  -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-activity" role="tabpanel">
+                <div class="table-card">
+                    <div class="p-4 border-bottom">
+                        <h5 class="fw-bold mb-1">Platform Activity & Audit Logs</h5>
+                        <p class="text-secondary small mb-0">Real-time trail of signups, trial extensions, plan activations, and admin interventions.</p>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Event Action</th>
+                                    <th>Company</th>
+                                    <th>Actor</th>
+                                    <th>Description</th>
+                                    <th>IP Address</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in activity_logs %}
+                                <tr>
+                                    <td>
+                                        <div class="small fw-semibold text-dark">{{ log.created_at|date:"M d, Y" }}</div>
+                                        <div class="small text-muted">{{ log.created_at|time:"H:i:s" }} IST</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border fw-bold">{{ log.action }}</span>
+                                    </td>
+                                    <td>
+                                        {% if log.workspace %}
+                                        <span class="fw-semibold text-dark">{{ log.workspace.name }}</span>
+                                        {% else %}
+                                        <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="small">{{ log.actor.username|default:"System" }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="small text-secondary">{{ log.description }}</span>
+                                    </td>
+                                    <td>
+                                        <span class="small text-muted font-monospace">{{ log.ip_address|default:"—" }}</span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        No activity logs recorded yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============================================================= -->
+            <!-- TAB 10: ERROR MANAGEMENT & EXCEPTION LOGS                      -->
+            <!-- ============================================================= -->
+            <div class="tab-pane fade" id="tab-errors" role="tabpanel">
+                <!-- Error KPIs -->
+                <div class="row g-3 mb-4">
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="stat-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted small fw-semibold">Total Caught Incidents</span>
+                                <div class="stat-icon bg-secondary-subtle text-secondary"><i class="fa-solid fa-clipboard-list"></i></div>
+                            </div>
+                            <h3 class="fw-bold mb-0">{{ total_error_logs }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="stat-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted small fw-semibold">Unresolved Errors</span>
+                                <div class="stat-icon bg-danger-subtle text-danger"><i class="fa-solid fa-circle-exclamation"></i></div>
+                            </div>
+                            <h3 class="fw-bold mb-0 text-danger">{{ unresolved_error_logs }}</h3>
+                        </div>
+                    </div>
+                    <div class="col-sm-6 col-xl-4">
+                        <div class="stat-card">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="text-muted small fw-semibold">Critical 500 Failures</span>
+                                <div class="stat-icon bg-danger-subtle text-danger"><i class="fa-solid fa-fire"></i></div>
+                            </div>
+                            <h3 class="fw-bold mb-0 text-danger">{{ critical_error_logs }}</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-card">
+                    <div class="p-4 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-3">
+                        <div>
+                            <h5 class="fw-bold mb-1"><i class="fa-solid fa-triangle-exclamation text-danger me-2"></i>Platform Error Management & Exception Logs</h5>
+                            <p class="text-secondary small mb-0">Automated capture of uncaught 500 exceptions, database outages, and system faults across all company workspaces.</p>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <form method="POST" action="{% url 'platform_admin_trigger_test_error' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold" title="Simulates a captured test exception">
+                                    <i class="fa-solid fa-bug me-1"></i> Trigger Test Error
+                                </button>
+                            </form>
+                            <form method="POST" action="{% url 'platform_admin_clear_errors' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="scope" value="resolved">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm fw-semibold">
+                                    <i class="fa-solid fa-broom me-1"></i> Clear Resolved
+                                </button>
+                            </form>
+                            <form method="POST" action="{% url 'platform_admin_clear_errors' %}" onsubmit="return confirm('Are you sure you want to delete ALL error logs?');">
+                                {% csrf_token %}
+                                <input type="hidden" name="scope" value="all">
+                                <button type="submit" class="btn btn-outline-danger btn-sm fw-semibold">
+                                    <i class="fa-solid fa-trash me-1"></i> Clear All
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="bg-light">
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Severity / Code</th>
+                                    <th>Error Type & Path</th>
+                                    <th>Company Workspace</th>
+                                    <th>User / IP</th>
+                                    <th>Message Preview</th>
+                                    <th class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for err in error_logs %}
+                                <tr>
+                                    <td>
+                                        <div class="small fw-semibold text-dark">{{ err.created_at|date:"M d, Y" }}</div>
+                                        <div class="small text-muted font-monospace">{{ err.created_at|time:"H:i:s" }} IST</div>
+                                    </td>
+                                    <td>
+                                        {% if err.status_code >= 500 %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle fw-bold px-2 py-1">
+                                            <i class="fa-solid fa-circle-xmark me-1"></i>{{ err.status_code }} {{ err.severity }}
+                                        </span>
+                                        {% elif err.status_code >= 400 %}
+                                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle fw-bold px-2 py-1">
+                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>{{ err.status_code }} {{ err.severity }}
+                                        </span>
+                                        {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border fw-bold px-2 py-1">
+                                            {{ err.status_code }} {{ err.severity }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark font-monospace small">{{ err.error_type }}</div>
+                                        <div class="text-muted small font-monospace"><span class="badge bg-light text-dark border me-1">{{ err.request_method|default:'GET' }}</span>{{ err.request_path|truncatechars:40 }}</div>
+                                    </td>
+                                    <td>
+                                        {% if err.workspace %}
+                                        <span class="fw-semibold text-dark">{{ err.workspace.name }}</span>
+                                        <div class="small text-muted font-monospace">{{ err.workspace.slug }}.{{ saas_brand.root_domain|default:'anasrawuthar.in' }}</div>
+                                        {% else %}
+                                        <span class="badge bg-light text-muted border">Platform Root</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="small fw-semibold">{{ err.actor.username|default:"Anonymous" }}</div>
+                                        <div class="small text-muted font-monospace">{{ err.ip_address|default:"—" }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="small text-secondary" title="{{ err.message }}">{{ err.message|truncatechars:70 }}</span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex align-items-center justify-content-end gap-2">
+                                            <button type="button" class="btn btn-outline-primary btn-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#errModal{{ err.id }}">
+                                                <i class="fa-solid fa-code me-1"></i> Traceback
+                                            </button>
+                                            {% if not err.is_resolved %}
+                                            <form method="POST" action="{% url 'platform_admin_resolve_error' err.id %}" class="d-inline">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-success btn-sm fw-semibold" title="Mark this error as resolved">
+                                                    <i class="fa-solid fa-check me-1"></i> Resolve
+                                                </button>
+                                            </form>
+                                            {% else %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                                <i class="fa-solid fa-circle-check me-1"></i> Resolved
+                                            </span>
+                                            {% endif %}
+                                        </div>
+
+                                        <!-- Traceback Modal for this error -->
+                                        <div class="modal fade" id="errModal{{ err.id }}" tabindex="-1" aria-hidden="true" style="text-align: left;">
+                                            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+                                                <div class="modal-content border-0 shadow-lg">
+                                                    <div class="modal-header bg-dark text-white">
+                                                        <div class="d-flex align-items-center gap-2">
+                                                            <i class="fa-solid fa-bug text-danger fs-5"></i>
+                                                            <h5 class="modal-title fw-bold mb-0">Error #{{ err.id }}: {{ err.error_type }}</h5>
+                                                        </div>
+                                                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body p-4 bg-light">
+                                                        <div class="row g-3 mb-3">
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted fw-bold text-uppercase d-block">Status & Level</small>
+                                                                <span class="badge bg-danger fs-6">{{ err.status_code }} {{ err.severity }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted fw-bold text-uppercase d-block">Request Route</small>
+                                                                <span class="font-monospace fw-semibold">{{ err.request_method }} {{ err.request_path }}</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted fw-bold text-uppercase d-block">Occurred At</small>
+                                                                <span>{{ err.created_at|date:"Y-m-d H:i:s" }} IST</span>
+                                                            </div>
+                                                            <div class="col-md-3">
+                                                                <small class="text-muted fw-bold text-uppercase d-block">Client IP & User</small>
+                                                                <span class="font-monospace">{{ err.ip_address|default:"—" }} ({{ err.actor.username|default:"Anonymous" }})</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label fw-bold text-dark">Exception Message:</label>
+                                                            <div class="p-3 bg-white border border-danger-subtle rounded-3 text-danger font-monospace small">
+                                                                {{ err.message }}
+                                                            </div>
+                                                        </div>
+
+                                                        <div>
+                                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                                <label class="form-label fw-bold text-dark mb-0">Stack Traceback:</label>
+                                                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('tb-text-{{ err.id }}').innerText); this.innerHTML='<i class=\'fa-solid fa-check me-1\'></i> Copied!'; setTimeout(() => this.innerHTML='<i class=\'fa-solid fa-copy me-1\'></i> Copy', 2000);">
+                                                                    <i class="fa-solid fa-copy me-1"></i> Copy Traceback
+                                                                </button>
+                                                            </div>
+                                                            <pre class="bg-dark text-light p-3 rounded-3 font-monospace small" style="max-height: 420px; overflow-y: auto;" id="tb-text-{{ err.id }}"><code>{{ err.traceback|default:"No stack traceback recorded for this incident." }}</code></pre>
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer bg-white">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                        {% if not err.is_resolved %}
+                                                        <form method="POST" action="{% url 'platform_admin_resolve_error' err.id %}" class="d-inline">
+                                                            {% csrf_token %}
+                                                            <button type="submit" class="btn btn-success fw-semibold">
+                                                                <i class="fa-solid fa-check me-1"></i> Mark as Resolved
+                                                            </button>
+                                                        </form>
+                                                        {% endif %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-5">
+                                        <i class="fa-solid fa-circle-check text-success fs-1 mb-2 d-block"></i>
+                                        <h6 class="fw-bold text-dark mb-1">Zero Errors Recorded</h6>
+                                        <p class="text-muted small mb-0">No uncaught exceptions or server errors detected on the platform. All systems operating smoothly.</p>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- MODAL: EXTEND PLAN EXPIRY DATE                                -->
+    <!-- ============================================================= -->
+    <div class="modal fade" id="extendPlanModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-calendar-plus me-2"></i>Extend Company Plan Expiry</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="extendPlanForm">
+                    {% csrf_token %}
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Company Name</label>
+                            <input type="text" id="extendModalCompanyName" class="form-control" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Assigned Plan</label>
+                            <select name="plan_name" id="extendModalPlanName" class="form-select">
+                                {% for p in plans %}
+                                <option value="{{ p.name }}">{{ p.name }} (₹{{ p.price|floatformat:0 }}/mo)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Extension Duration</label>
+                            <div class="d-flex flex-wrap gap-2 mb-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1" onclick="selectPresetDays(30)">+30 Days (1 Mo)</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1" onclick="selectPresetDays(90)">+90 Days (Quarter)</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1" onclick="selectPresetDays(180)">+180 Days (Half-Yr)</button>
+                                <button type="button" class="btn btn-outline-primary btn-sm flex-grow-1" onclick="selectPresetDays(365)">+365 Days (1 Year)</button>
+                            </div>
+                            <input type="hidden" name="extension_mode" id="extensionMode" value="days">
+                            <input type="number" name="days" id="extendDaysInput" class="form-control mb-2" value="30" placeholder="Number of days to extend">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold text-muted">Or Pick Specific Expiration Date</label>
+                            <input type="date" name="custom_date" id="extendCustomDate" class="form-control" onchange="document.getElementById('extensionMode').value='date';">
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary fw-bold px-4">
+                            <i class="fa-solid fa-check me-1"></i> Apply Plan Extension
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- MODAL: CREATE / EDIT PLAN                                     -->
+    <!-- ============================================================= -->
+    <div class="modal fade" id="createPlanModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title fw-bold" id="planModalTitle"><i class="fa-solid fa-layer-group me-2 text-warning"></i>Create Subscription Plan</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" action="{% url 'platform_admin_save_plan' %}" id="planForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="plan_id" id="planFormId" value="">
+
+                    <div class="modal-body p-4">
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-8">
+                                <label class="form-label small fw-bold">Plan Name <span class="text-danger">*</span></label>
+                                <input type="text" name="name" id="planFormName" class="form-control" placeholder="e.g. Professional" required>
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label small fw-bold">Slug</label>
+                                <input type="text" name="slug" id="planFormSlug" class="form-control" placeholder="pro">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Price (₹) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" name="price" id="planFormPrice" class="form-control" placeholder="1999" required>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Billing Cycle</label>
+                                <select name="billing_interval" id="planFormInterval" class="form-select">
+                                    <option value="monthly">Monthly</option>
+                                    <option value="annual">Annual</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-4">
+                                <label class="form-label small fw-bold">Max Staff</label>
+                                <input type="number" name="max_staff" id="planFormMaxStaff" class="form-control" value="10">
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label small fw-bold">Tickets / Mo</label>
+                                <input type="number" name="max_tickets_per_month" id="planFormTickets" class="form-control" value="500">
+                            </div>
+                            <div class="col-sm-4">
+                                <label class="form-label small fw-bold">Storage (MB)</label>
+                                <input type="number" name="storage_limit_mb" id="planFormStorage" class="form-control" value="2000">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Feature Bullets (One per line)</label>
+                            <textarea name="features_text" id="planFormFeatures" rows="3" class="form-control small" placeholder="WhatsApp Notifications&#10;Inventory Tracking&#10;Priority Support"></textarea>
+                        </div>
+
+                        <div class="d-flex gap-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_active" id="planFormActive" checked>
+                                <label class="form-check-label small fw-semibold" for="planFormActive">Active Plan</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="is_popular" id="planFormPopular">
+                                <label class="form-check-label small fw-semibold" for="planFormPopular">Mark as Popular</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary fw-bold px-4">Save Plan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================= -->
+    <!-- MODAL: RECORD PAYMENT                                         -->
+    <!-- ============================================================= -->
+    <div class="modal fade" id="recordPaymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-circle-check me-2"></i>Record Subscription Payment</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <form method="POST" id="paymentForm">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="record_payment">
+
+                    <div class="modal-body p-4">
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Target Company <span class="text-danger">*</span></label>
+                            <select class="form-select" id="paymentWorkspaceSelect" required onchange="updatePaymentFormAction(this.value)">
+                                <option value="">-- Choose Company --</option>
+                                {% for item in workspaces %}
+                                <option value="{{ item.obj.id }}">{{ item.obj.name }} ({{ item.obj.slug }}.zyndesk.com)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Amount (₹) <span class="text-danger">*</span></label>
+                                <input type="number" step="0.01" name="amount" class="form-control" placeholder="1999.00" required>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Plan</label>
+                                <select name="plan_name" class="form-select">
+                                    {% for p in plans %}
+                                    <option value="{{ p.name }}">{{ p.name }} (₹{{ p.price|floatformat:0 }})</option>
+                                    {% endfor %}
+                                    <option value="Custom Plan">Custom Plan</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Payment Method</label>
+                                <select name="payment_method" class="form-select">
+                                    <option value="UPI">UPI / GPay / PhonePe</option>
+                                    <option value="Bank Transfer">Bank Transfer / NEFT</option>
+                                    <option value="Razorpay">Razorpay Online</option>
+                                    <option value="Stripe">Stripe Credit Card</option>
+                                    <option value="Cash">Cash</option>
+                                </select>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label small fw-bold">Coverage (Months)</label>
+                                <select name="period_months" class="form-select">
+                                    <option value="1">1 Month</option>
+                                    <option value="3">3 Months (Quarter)</option>
+                                    <option value="6">6 Months</option>
+                                    <option value="12">12 Months (1 Year)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold">Reference / UTR / Transaction ID</label>
+                            <input type="text" name="reference_id" class="form-control" placeholder="e.g. UTR123456789">
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Notes</label>
+                            <textarea name="notes" rows="2" class="form-control small" placeholder="Optional notes..."></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer bg-light">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success fw-bold px-4">Save Payment Record</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function updatePaymentFormAction(workspaceId) {
+            const form = document.getElementById('paymentForm');
+            if (workspaceId) {
+                form.action = '/platform-admin/action/' + workspaceId + '/';
+            }
+        }
+
+        function openExtendPlanModal(workspaceId, companyName, planName, expiryDate) {
+            const modal = new bootstrap.Modal(document.getElementById('extendPlanModal'));
+            document.getElementById('extendPlanForm').action = '/platform-admin/extend-plan/' + workspaceId + '/';
+            document.getElementById('extendModalCompanyName').value = companyName;
+            
+            const planSelect = document.getElementById('extendModalPlanName');
+            for (let i = 0; i < planSelect.options.length; i++) {
+                if (planSelect.options[i].value === planName) {
+                    planSelect.selectedIndex = i;
+                    break;
+                }
+            }
+
+            if (expiryDate) {
+                document.getElementById('extendCustomDate').value = expiryDate;
+            }
+            modal.show();
+        }
+
+        function selectPresetDays(days) {
+            document.getElementById('extensionMode').value = 'days';
+            document.getElementById('extendDaysInput').value = days;
+            document.getElementById('extendCustomDate').value = '';
+        }
+
+        function openEditPlanModal(id, name, slug, price, interval, maxStaff, tickets, storage, features, isActive, isPopular) {
+            document.getElementById('planModalTitle').innerHTML = '<i class="fa-solid fa-pen-to-square me-2 text-warning"></i>Edit Subscription Plan';
+            document.getElementById('planFormId').value = id;
+            document.getElementById('planFormName').value = name;
+            document.getElementById('planFormSlug').value = slug;
+            document.getElementById('planFormPrice').value = price;
+            document.getElementById('planFormInterval').value = interval;
+            document.getElementById('planFormMaxStaff').value = maxStaff;
+            document.getElementById('planFormTickets').value = tickets;
+            document.getElementById('planFormStorage').value = storage;
+            document.getElementById('planFormFeatures').value = features;
+            document.getElementById('planFormActive').checked = isActive;
+            document.getElementById('planFormPopular').checked = isPopular;
+
+            new bootstrap.Modal(document.getElementById('createPlanModal')).show();
+        }
+
+        function toggleCustomVerificationSmtp(checked) {
+            const el = document.getElementById('customVerificationSmtpFields');
+            el.style.display = checked ? 'block' : 'none';
+        }
+
+        function toggleWhatsAppProvider(val) {
+            document.getElementById('waBridgeFields').style.display = (val === 'bridge') ? 'block' : 'none';
+            document.getElementById('waMetaFields').style.display = (val === 'meta_cloud') ? 'block' : 'none';
+        }
+
+        function syncEncryptionMode(mode) {
+            const sslBox = document.getElementById('smtp_use_ssl');
+            const tlsBox = document.getElementById('smtp_use_tls');
+            if (mode === 'ssl') {
+                sslBox.checked = true;
+                tlsBox.checked = false;
+            } else if (mode === 'tls') {
+                sslBox.checked = false;
+                tlsBox.checked = true;
+            } else {
+                sslBox.checked = false;
+                tlsBox.checked = false;
+            }
+        }
+
+        function autoSelectEncryptionByPort(portVal) {
+            const port = parseInt(portVal, 10);
+            if (port === 465) {
+                document.getElementById('enc_ssl').checked = true;
+                syncEncryptionMode('ssl');
+            } else if (port === 587 || port === 2525) {
+                document.getElementById('enc_tls').checked = true;
+                syncEncryptionMode('tls');
+            } else if (port === 25) {
+                document.getElementById('enc_none').checked = true;
+                syncEncryptionMode('none');
+            }
+        }
+
+        function applySmtpPreset(provider) {
+            const hostInput = document.getElementById('smtp_host');
+            const portInput = document.getElementById('smtp_port');
+            const userInput = document.getElementById('smtp_user');
+
+            if (provider === 'hostinger') {
+                hostInput.value = 'smtp.hostinger.com';
+                portInput.value = '465';
+                document.getElementById('enc_ssl').checked = true;
+                syncEncryptionMode('ssl');
+                if (!userInput.value) userInput.placeholder = 'e.g. noreplay@yourdomain.com';
+            } else if (provider === 'gmail') {
+                hostInput.value = 'smtp.gmail.com';
+                portInput.value = '587';
+                document.getElementById('enc_tls').checked = true;
+                syncEncryptionMode('tls');
+                if (!userInput.value) userInput.placeholder = 'your-google-account@gmail.com';
+            } else if (provider === 'sendgrid') {
+                hostInput.value = 'smtp.sendgrid.net';
+                portInput.value = '587';
+                document.getElementById('enc_tls').checked = true;
+                syncEncryptionMode('tls');
+                userInput.value = 'apikey';
+            } else if (provider === 'ses') {
+                hostInput.value = 'email-smtp.us-east-1.amazonaws.com';
+                portInput.value = '587';
+                document.getElementById('enc_tls').checked = true;
+                syncEncryptionMode('tls');
+            }
+        }
+
+        async function checkLiveSmtpStatus() {
+            const btn = document.getElementById('btn-ping-smtp');
+            const dot = document.getElementById('smtp-status-dot');
+            const title = document.getElementById('smtp-status-title');
+            const sub = document.getElementById('smtp-status-sub');
+            const badge = document.getElementById('smtp-status-badge');
+
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Testing...';
+            badge.className = 'badge bg-warning-subtle text-warning border border-warning-subtle fw-semibold px-2 py-1';
+            badge.textContent = 'Pinging...';
+
+            try {
+                const res = await fetch("{% url 'platform_admin_check_smtp_status' %}");
+                const data = await res.json();
+                if (data.success) {
+                    dot.className = 'badge rounded-pill bg-success p-2';
+                    title.innerHTML = `Connected: <span class="font-monospace text-success">${data.host}:${data.port}</span> <span class="badge bg-success ms-1">${data.encryption}</span>`;
+                    sub.textContent = `Server response: ${data.message} • Sender: ${data.from_email}`;
+                    badge.className = 'badge bg-success-subtle text-success border border-success-subtle fw-semibold px-2 py-1';
+                    badge.textContent = 'Operational';
+                } else {
+                    dot.className = 'badge rounded-pill bg-danger p-2';
+                    title.innerHTML = `<span class="text-danger">Connection Failed:</span> <span class="font-monospace">${data.host}:${data.port}</span>`;
+                    sub.textContent = data.message;
+                    badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold px-2 py-1';
+                    badge.textContent = 'Disconnected';
+                }
+            } catch (err) {
+                dot.className = 'badge rounded-pill bg-danger p-2';
+                sub.textContent = 'Network or endpoint error while testing SMTP.';
+                badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle fw-semibold px-2 py-1';
+                badge.textContent = 'Error';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-bolt me-1"></i> Check Live Status';
+            }
+        }
+
+        // Activate Tab from URL parameter ?tab=...
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const activeTab = urlParams.get('tab') || '{{ active_tab }}' || 'companies';
+            const tabBtn = document.getElementById('tab-' + activeTab + '-btn');
+            if (tabBtn) {
+                new bootstrap.Tab(tabBtn).show();
+            }
+        });
+    </script>
+</body>
+</html>

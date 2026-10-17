@@ -1,13 +1,13 @@
 {% extends "job_tickets/base.html" %}
 
-{% block title %}Service Billing | GI Hostings{% endblock %}
+{% block title %}ZynDesk — Every Service. One Desk{% endblock %}
 
 {% block content %}
 <section class="section-container hero-shell">
     <div class="row align-items-center g-4">
         <div class="col-lg-7">
             <span class="hero-kicker">Production-Ready Service Workflow</span>
-            <h1 class="hero-title mt-2">Service Billing for Job Ticket Management</h1>
+            <h1 class="hero-title mt-2">ZynDesk — Every Service. One Desk</h1>
             <p class="hero-text">
                 Handle client intake, repair lifecycle, billing, and tracking in one workflow designed for real operations.
             </p>
@@ -35,14 +35,14 @@
         <div class="col-lg-5">
             <div class="highlight-card">
                 <h5 class="mb-3">Support Contact</h5>
-                <p class="mb-2"><i class="fas fa-building me-2"></i>{{ company.company_name|default:"GI Hostings" }}</p>
+                <p class="mb-2"><i class="fas fa-building me-2"></i>{{ company.company_name|default:"ZynDesk" }}</p>
                 <p class="mb-2"><i class="fas fa-phone me-2"></i>{{ company.phone1|default:"+919567227005" }}</p>
                 <p class="mb-0">
                     <i class="fas fa-globe me-2"></i>
                     {% if company.website %}
                         <a href="{{ company.website }}" target="_blank" rel="noopener">{{ company.website }}</a>
                     {% else %}
-                        <a href="https://gihostings.com" target="_blank" rel="noopener">https://gihostings.com</a>
+                        <a href="https://anasrawuthar.in" target="_blank" rel="noopener">https://anasrawuthar.in</a>
                     {% endif %}
                 </p>
             </div>

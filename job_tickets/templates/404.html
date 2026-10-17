@@ -1,42 +1,144 @@
-{% extends "job_tickets/base.html" %}
-{% block title %}Page Not Found{% endblock %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 — Page Not Found | ZynDesk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="icon" type="image/jpeg" href="https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: radial-gradient(circle at 50% 10%, #eff6ff 0%, #f8fafc 100%);
+            color: #0f172a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .error-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            padding: 48px 40px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+        }
+        .brand-logo {
+            height: 48px;
+            width: auto;
+            border-radius: 10px;
+            margin-bottom: 24px;
+        }
+        .error-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #eff6ff;
+            color: #2563eb;
+            border: 1px solid #bfdbfe;
+            padding: 6px 14px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .error-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .error-desc {
+            color: #64748b;
+            font-size: 1.02rem;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        .actions-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 13px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .btn-primary {
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.35);
+        }
+        .btn-primary:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+        .btn-outline {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+        }
+        .btn-outline:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+        .footer-note {
+            margin-top: 32px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <img src="https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg" alt="ZynDesk Logo" class="brand-logo" onerror="this.style.display='none'">
+        <div>
+            <span class="error-badge">
+                <i class="fa-solid fa-magnifying-glass"></i> Error 404
+            </span>
+        </div>
+        <h1 class="error-title">Page not found</h1>
+        <p class="error-desc">
+            The link you followed may be broken, or the page may have been removed or moved to a different address.
+        </p>
 
-{% block content %}
-<div class="section-container text-center">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <i class="fas fa-exclamation-triangle text-warning" style="font-size: 4rem;"></i>
-            <h1 class="mt-3">404 - Page Not Found</h1>
-            <p class="lead">The page you're looking for doesn't exist or has been moved.</p>
-            
-            <div class="mt-4">
-                {% if user.is_authenticated %}
-                    {% if user.is_staff %}
-                        <a href="{% url 'staff_dashboard' %}" class="btn btn-primary me-2">
-                            <i class="fas fa-home"></i> Staff Dashboard
-                        </a>
-                    {% elif user.groups.all.0.name == 'Technicians' %}
-                        <a href="{% url 'technician_dashboard' %}" class="btn btn-primary me-2">
-                            <i class="fas fa-home"></i> Technician Dashboard
-                        </a>
-                    {% else %}
-                        <a href="{% url 'home' %}" class="btn btn-primary me-2">
-                            <i class="fas fa-home"></i> Home
-                        </a>
-                    {% endif %}
-                    <a href="{% url 'logout' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-sign-out-alt"></i> Logout
-                    </a>
-                {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-primary me-2">
-                        <i class="fas fa-sign-in-alt"></i> Login
-                    </a>
-                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">
-                        <i class="fas fa-home"></i> Home
-                    </a>
-                {% endif %}
-            </div>
+        <div class="actions-group">
+            <a href="/" class="btn btn-primary">
+                <i class="fa-solid fa-house"></i> Return to Home
+            </a>
+            <a href="/login/" class="btn btn-outline">
+                <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
+            </a>
+            <a href="/client-login/" class="btn btn-outline">
+                <i class="fa-solid fa-ticket"></i> Track Service Status
+            </a>
+        </div>
+
+        <div class="footer-note">
+            ZynDesk Platform • Every Service. One Desk
         </div>
     </div>
-</div>
-{% endblock %}
+</body>
+</html>

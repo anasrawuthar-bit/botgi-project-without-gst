@@ -32,6 +32,15 @@ class CompanyWorkspace(models.Model):
     contact_phone = models.CharField(max_length=20, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_TRIAL, db_index=True)
     plan_name = models.CharField(max_length=80, default='Starter')
+    trial_ends_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp when 7-day trial expires")
+    plan_expires_at = models.DateTimeField(null=True, blank=True, help_text="Expiry date for active paid plans")
+    storage_limit_mb = models.PositiveIntegerField(default=500, help_text="Storage limit in megabytes")
+    max_staff_limit = models.PositiveIntegerField(default=5, help_text="Maximum staff/technician accounts allowed")
+    max_tickets_per_month = models.PositiveIntegerField(default=100, help_text="Monthly ticket quota")
+    custom_domain = models.CharField(max_length=255, unique=True, null=True, blank=True, help_text="Custom domain e.g. crm.tenant.com")
+    custom_domain_verified = models.BooleanField(default=False)
+    email_verified = models.BooleanField(default=False)
+    email_verified_at = models.DateTimeField(null=True, blank=True)
     timezone_name = models.CharField(max_length=80, default='Asia/Kolkata')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -43,6 +52,98 @@ class CompanyWorkspace(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def is_trial(self):
+        return self.status == self.STATUS_TRIAL
+
+    @property
+    def is_trial_expired(self):
+        if self.status != self.STATUS_TRIAL or not self.trial_ends_at:
+            return False
+        return timezone.now() > self.trial_ends_at
+
+    @property
+    def effective_expiry_date(self):
+        if self.status == self.STATUS_TRIAL:
+            return self.trial_ends_at
+        return self.plan_expires_at or self.trial_ends_at
+
+    @property
+    def is_plan_expired(self):
+        if self.status == self.STATUS_SUSPENDED:
+            return True
+        if self.status == self.STATUS_TRIAL:
+            return self.is_trial_expired
+        if self.plan_expires_at:
+            return timezone.now() > self.plan_expires_at
+        return False
+
+    @property
+    def is_suspended(self):
+        return self.status == self.STATUS_SUSPENDED
+
+    @property
+    def days_left_in_trial(self):
+        expiry = self.effective_expiry_date
+        if not expiry:
+            return 0
+        diff = expiry - timezone.now()
+        if diff.total_seconds() <= 0:
+            return 0
+        return diff.days + (1 if diff.seconds > 0 else 0)
+
+    @property
+    def days_left(self):
+        return self.days_left_in_trial
+
+    def get_storage_used_bytes(self):
+        from django.apps import apps
+        total = 0
+        try:
+            JobTicketPhoto = apps.get_model('job_tickets', 'JobTicketPhoto')
+            for photo in JobTicketPhoto.objects.filter(ticket__workspace=self):
+                if photo.image and hasattr(photo.image, 'size'):
+                    try:
+                        total += photo.image.size
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        try:
+            TaskAttachment = apps.get_model('job_tickets', 'TaskAttachment')
+            for att in TaskAttachment.objects.filter(task__workspace=self):
+                if att.file and hasattr(att.file, 'size'):
+                    try:
+                        total += att.file.size
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return total
+
+    def get_storage_used_mb(self):
+        bytes_val = self.get_storage_used_bytes()
+        return round(bytes_val / (1024 * 1024), 2)
+
+    def get_storage_percent(self):
+        limit = self.storage_limit_mb or 500
+        used = self.get_storage_used_mb()
+        return min(100, round((used / limit) * 100, 1))
+
+    def get_current_month_tickets_count(self):
+        from django.apps import apps
+        try:
+            JobTicket = apps.get_model('job_tickets', 'JobTicket')
+            now = timezone.now()
+            start_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            return JobTicket.objects.filter(workspace=self, created_at__gte=start_of_month).count()
+        except Exception:
+            return 0
+
+    def get_active_staff_count(self):
+        return self.memberships.filter(is_active=True).count()
+
     def save(self, *args, **kwargs):
         if not self.slug:
             base_slug = slugify(self.name) or 'workspace'
@@ -52,6 +153,8 @@ class CompanyWorkspace(models.Model):
                 slug = f'{base_slug}-{counter}'
                 counter += 1
             self.slug = slug
+        if self.status == self.STATUS_TRIAL and not self.trial_ends_at:
+            self.trial_ends_at = timezone.now() + datetime.timedelta(days=7)
         super().save(*args, **kwargs)
 
 
@@ -1993,15 +2096,15 @@ class CompanyProfile(models.Model):
         db_index=True,
     )
     # Basic Info
-    company_name = models.CharField(max_length=200, default="GI Hostings")
+    company_name = models.CharField(max_length=200, default="ZynDesk")
     legal_name = models.CharField(
         max_length=200,
         blank=True,
         help_text="Registered legal name used on GST documents.",
     )
-    tagline = models.CharField(max_length=200, default="Service Billing", blank=True)
+    tagline = models.CharField(max_length=200, default="Every Service. One Desk", blank=True)
     logo = models.ImageField(upload_to='company_logos/', blank=True, null=True)
-    logo_url = models.URLField(max_length=500, blank=True, help_text="Or use image URL")
+    logo_url = models.URLField(max_length=500, blank=True, default="https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg", help_text="Or use image URL")
     
     # Contact Details
     address = models.TextField(default="Your Business Address")
@@ -2011,7 +2114,7 @@ class CompanyProfile(models.Model):
     phone1 = models.CharField(max_length=20, default="+919567227005")
     phone2 = models.CharField(max_length=20, blank=True)
     email = models.EmailField(blank=True)
-    website = models.URLField(blank=True, default="https://gihostings.com")
+    website = models.URLField(blank=True, default="https://anasrawuthar.in")
     
     # Legal & Tax Details
     gstin = models.CharField(
@@ -2205,7 +2308,7 @@ class CompanyProfile(models.Model):
                     return root_profile.logo.url
                 if root_profile.logo_url:
                     return root_profile.logo_url
-        return ""
+        return "/static/img/logo.png"
     
     @classmethod
     def get_profile(cls, workspace=None):
@@ -2224,10 +2327,10 @@ class CompanyProfile(models.Model):
 
 
 class PlatformSettings(models.Model):
-    """Platform-level branding and footer support settings."""
+    """Platform-level branding, footer support, communications, and payments settings."""
     billing_author_name = models.CharField(
         max_length=200,
-        default="GI HOSTINGS",
+        default="ZynDesk",
         help_text="Footer author name shown as 'Service Billing by ...'",
     )
     support_phone = models.CharField(
@@ -2240,7 +2343,89 @@ class PlatformSettings(models.Model):
         default="+91 9567227005",
         help_text="WhatsApp support number displayed in footer.",
     )
-    website = models.URLField(blank=True, default="https://gihostings.com")
+    website = models.URLField(blank=True, default="https://anasrawuthar.in")
+
+    # 1. SMTP Configuration (System / Transactional Emails)
+    smtp_host = models.CharField(max_length=255, blank=True, default="", help_text="SMTP server host (e.g. smtp.gmail.com)")
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_user = models.CharField(max_length=255, blank=True, default="", help_text="SMTP user / email / API key")
+    smtp_password = models.CharField(max_length=255, blank=True, default="", help_text="SMTP password / app password")
+    smtp_use_tls = models.BooleanField(default=True)
+    smtp_use_ssl = models.BooleanField(default=False)
+    smtp_from_email = models.CharField(max_length=255, blank=True, default="notifications@zyndesk.com")
+
+    # 2. Email Verification SMTP Configuration
+    email_verification_enabled = models.BooleanField(default=True, help_text="Require email verification for new account registrations")
+    email_verification_use_custom_smtp = models.BooleanField(default=False, help_text="Use dedicated verification SMTP credentials")
+    email_verification_smtp_host = models.CharField(max_length=255, blank=True, default="")
+    email_verification_smtp_port = models.PositiveIntegerField(default=587)
+    email_verification_smtp_user = models.CharField(max_length=255, blank=True, default="")
+    email_verification_smtp_password = models.CharField(max_length=255, blank=True, default="")
+    email_verification_smtp_use_tls = models.BooleanField(default=True)
+    email_verification_smtp_from_email = models.CharField(max_length=255, blank=True, default="verify@zyndesk.com")
+    email_verification_token_expiry_hours = models.PositiveIntegerField(default=24)
+
+    # 3. WhatsApp Configuration (Platform Global Gateway)
+    whatsapp_provider = models.CharField(
+        max_length=50,
+        default='bridge',
+        choices=[
+            ('bridge', 'WhatsApp Local QR Bridge (Node.js)'),
+            ('meta_cloud', 'Meta WhatsApp Cloud API (Official)'),
+            ('twilio', 'Twilio WhatsApp API'),
+        ],
+    )
+    whatsapp_meta_phone_number_id = models.CharField(max_length=100, blank=True, default="")
+    whatsapp_meta_business_account_id = models.CharField(max_length=100, blank=True, default="")
+    whatsapp_meta_access_token = models.TextField(blank=True, default="")
+    whatsapp_bridge_url = models.CharField(max_length=255, blank=True, default="http://localhost:3000")
+    whatsapp_bridge_client_id = models.CharField(max_length=100, blank=True, default="zyndesk_default")
+    whatsapp_bridge_secret = models.CharField(max_length=255, blank=True, default="")
+    whatsapp_default_country_code = models.CharField(max_length=10, default="+91")
+
+    # 4. OTP Configuration
+    otp_enabled = models.BooleanField(default=True)
+    otp_provider = models.CharField(
+        max_length=50,
+        default='fast2sms',
+        choices=[
+            ('fast2sms', 'Fast2SMS Gateway'),
+            ('msg91', 'MSG91 SMS Gateway'),
+            ('twilio', 'Twilio SMS API'),
+            ('email', 'Email-Based OTP'),
+        ],
+    )
+    otp_api_key = models.CharField(max_length=255, blank=True, default="")
+    otp_sender_id = models.CharField(max_length=50, blank=True, default="", help_text="Sender ID or DLT Header")
+    otp_template_id = models.CharField(max_length=100, blank=True, default="", help_text="DLT registered template ID")
+    otp_length = models.PositiveIntegerField(default=6, choices=[(4, '4 Digits'), (6, '6 Digits')])
+    otp_expiry_minutes = models.PositiveIntegerField(default=10)
+
+    # 5. Payment Gateway Configuration
+    payment_gateway = models.CharField(
+        max_length=50,
+        default='razorpay',
+        choices=[
+            ('razorpay', 'Razorpay Payment Gateway'),
+            ('stripe', 'Stripe Payments'),
+            ('cashfree', 'Cashfree Payments'),
+            ('upi_manual', 'Direct Merchant UPI & Offline Bank Transfer'),
+        ],
+    )
+    payment_mode = models.CharField(
+        max_length=20,
+        default='test',
+        choices=[
+            ('test', 'Sandbox / Test Mode'),
+            ('live', 'Production / Live Mode'),
+        ],
+    )
+    payment_key_id = models.CharField(max_length=255, blank=True, default="", help_text="Public Key / Key ID")
+    payment_key_secret = models.CharField(max_length=255, blank=True, default="", help_text="Secret Key / Key Secret")
+    payment_webhook_secret = models.CharField(max_length=255, blank=True, default="")
+    payment_currency = models.CharField(max_length=10, default="INR")
+    payment_upi_id = models.CharField(max_length=100, blank=True, default="zyndesk@upi", help_text="Merchant UPI VPA")
+    payment_qr_image_url = models.URLField(max_length=500, blank=True, default="", help_text="Direct UPI QR code image URL")
 
     class Meta:
         verbose_name = "Platform Settings"
@@ -2264,6 +2449,72 @@ class PlatformSettings(models.Model):
     def get_settings(cls):
         settings_obj, created = cls.objects.get_or_create(id=1)
         return settings_obj
+
+    def get_smtp_connection(self, fail_silently=False, timeout=12):
+        """Create a Django SMTP connection safely resolving mutual exclusivity between TLS and SSL."""
+        from django.core.mail import get_connection
+        use_tls = bool(self.smtp_use_tls)
+        use_ssl = bool(self.smtp_use_ssl)
+        if use_ssl and use_tls:
+            if self.smtp_port == 465:
+                use_tls = False
+            else:
+                use_ssl = False
+        return get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=self.smtp_host,
+            port=self.smtp_port or (465 if use_ssl else 587),
+            username=self.smtp_user,
+            password=self.smtp_password,
+            use_tls=use_tls,
+            use_ssl=use_ssl,
+            timeout=timeout,
+            fail_silently=fail_silently,
+        )
+
+    def test_smtp_connection(self, timeout=10):
+        """Quickly test opening and closing the SMTP connection without sending an email."""
+        if not self.smtp_host:
+            return False, "SMTP Host is not configured."
+        try:
+            conn = self.get_smtp_connection(timeout=timeout)
+            conn.open()
+            conn.close()
+            enc = "SSL" if self.smtp_use_ssl else ("TLS" if self.smtp_use_tls else "None")
+            return True, f"Successfully connected to {self.smtp_host}:{self.smtp_port} ({enc})"
+        except Exception as e:
+            return False, str(e)
+
+
+class PlatformSubscriptionPlan(models.Model):
+    """SaaS plans that can be subscribed to by company workspaces."""
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=100, unique=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
+    billing_interval = models.CharField(
+        max_length=20,
+        choices=[('monthly', 'Monthly'), ('annual', 'Annual')],
+        default='monthly',
+    )
+    max_staff = models.PositiveIntegerField(default=5)
+    max_tickets_per_month = models.PositiveIntegerField(default=200)
+    storage_limit_mb = models.PositiveIntegerField(default=1000)
+    features_text = models.TextField(blank=True, help_text="List of plan features, one per line")
+    is_active = models.BooleanField(default=True)
+    is_popular = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['price']
+
+    def __str__(self):
+        return f"{self.name} (₹{self.price}/{self.billing_interval})"
+
+    @property
+    def features_list(self):
+        if not self.features_text:
+            return []
+        return [f.strip() for f in self.features_text.splitlines() if f.strip()]
 
 
 class WhatsAppIntegrationSettings(models.Model):
@@ -3344,6 +3595,98 @@ class MobileQrLoginToken(models.Model):
     @property
     def is_valid(self):
         return (not self.is_used) and (self.expires_at > timezone.now())
+
+
+class CompanySubscriptionPayment(models.Model):
+    workspace = models.ForeignKey(
+        CompanyWorkspace,
+        on_delete=models.CASCADE,
+        related_name='subscription_payments'
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    plan_name = models.CharField(max_length=100, default='Standard Plan')
+    payment_method = models.CharField(max_length=50, default='UPI')
+    reference_id = models.CharField(max_length=100, blank=True, help_text="Transaction or UTR number")
+    paid_at = models.DateTimeField(default=timezone.now)
+    period_start = models.DateField(default=timezone.now)
+    period_end = models.DateField()
+    notes = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-paid_at']
+
+    def __str__(self):
+        return f"{self.workspace.name} - ₹{self.amount} ({self.plan_name})"
+
+
+class PlatformActivityLog(models.Model):
+    workspace = models.ForeignKey(
+        CompanyWorkspace,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='platform_activity_logs'
+    )
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=100)
+    description = models.TextField()
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.action}] {self.description[:50]}"
+
+
+class PlatformErrorLog(models.Model):
+    LEVEL_INFO = 'INFO'
+    LEVEL_WARNING = 'WARNING'
+    LEVEL_ERROR = 'ERROR'
+    LEVEL_CRITICAL = 'CRITICAL'
+    LEVEL_CHOICES = [
+        (LEVEL_INFO, 'Info'),
+        (LEVEL_WARNING, 'Warning'),
+        (LEVEL_ERROR, 'Error'),
+        (LEVEL_CRITICAL, 'Critical'),
+    ]
+
+    workspace = models.ForeignKey(
+        CompanyWorkspace,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='error_logs'
+    )
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='recorded_errors')
+    error_type = models.CharField(max_length=150, default='UnhandledException')
+    severity = models.CharField(max_length=20, choices=LEVEL_CHOICES, default=LEVEL_ERROR)
+    status_code = models.IntegerField(default=500)
+    request_path = models.CharField(max_length=500, blank=True, default='')
+    request_method = models.CharField(max_length=10, blank=True, default='')
+    message = models.TextField()
+    traceback = models.TextField(blank=True, default='')
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    is_resolved = models.BooleanField(default=False)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='resolved_errors')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['is_resolved', '-created_at']),
+            models.Index(fields=['severity', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"[{self.severity}] {self.error_type} at {self.request_path}"
+
+
 
 
 

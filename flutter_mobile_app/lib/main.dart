@@ -71,7 +71,7 @@ class _MobileAppState extends State<MobileApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Botgi Technician',
+      title: 'ZynDesk',
       theme: AppTheme.light(),
       home: _isLoading
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))

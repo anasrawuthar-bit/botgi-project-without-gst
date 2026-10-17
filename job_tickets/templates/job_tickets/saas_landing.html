@@ -1,0 +1,372 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZynDesk — Every Service. One Desk | by Corezyn</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="icon" type="image/jpeg" href="{{ logo_url }}">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --accent: #3b82f6;
+            --dark: #0f172a;
+            --slate: #475569;
+            --light-bg: #f8fafc;
+        }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--light-bg);
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        .navbar-brand img {
+            height: 44px;
+            width: auto;
+            border-radius: 8px;
+            object-fit: contain;
+        }
+        .hero-section {
+            background: radial-gradient(circle at 50% 0%, #eff6ff 0%, #f8fafc 70%);
+            padding: 90px 0 70px;
+        }
+        .badge-pill {
+            background: #dbeafe;
+            color: #1e40af;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 50px;
+            font-size: 0.88rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .hero-title {
+            font-size: 3.2rem;
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            color: #0f172a;
+        }
+        .hero-title span {
+            background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-brand-primary {
+            background: #2563eb;
+            color: #fff;
+            font-weight: 600;
+            padding: 14px 28px;
+            border-radius: 12px;
+            border: none;
+            transition: all 0.2s ease;
+            box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+        }
+        .btn-brand-primary:hover {
+            background: #1d4ed8;
+            color: #fff;
+            transform: translateY(-2px);
+            box-shadow: 0 14px 25px -5px rgba(37, 99, 235, 0.5);
+        }
+        .btn-brand-outline {
+            border: 2px solid #cbd5e1;
+            color: #334155;
+            font-weight: 600;
+            padding: 12px 24px;
+            border-radius: 12px;
+            background: #fff;
+            transition: all 0.2s ease;
+        }
+        .btn-brand-outline:hover {
+            border-color: #94a3b8;
+            color: #0f172a;
+            background: #f8fafc;
+        }
+        .feature-card {
+            background: #fff;
+            border-radius: 16px;
+            border: 1px solid #e2e8f0;
+            padding: 32px 28px;
+            transition: all 0.25s ease;
+            height: 100%;
+        }
+        .feature-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.07);
+            border-color: #bfdbfe;
+        }
+        .feature-icon {
+            width: 52px;
+            height: 52px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            margin-bottom: 20px;
+        }
+        .icon-blue { background: #eff6ff; color: #2563eb; }
+        .icon-emerald { background: #ecfdf5; color: #059669; }
+        .icon-purple { background: #faf5ff; color: #7c3aed; }
+        .icon-amber { background: #fffbeb; color: #d97706; }
+        .icon-indigo { background: #eef2ff; color: #4f46e5; }
+        .icon-rose { background: #fff1f2; color: #e11d48; }
+
+        .cta-banner {
+            background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+            border-radius: 24px;
+            padding: 60px 40px;
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+        .cta-banner h2 { font-weight: 800; }
+        footer {
+            background: #0f172a;
+            color: #94a3b8;
+            padding: 40px 0;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top py-3">
+        <div class="container">
+            <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'home' %}">
+                <img src="{{ logo_url }}" alt="Corezyn Logo">
+                <div class="d-flex flex-column">
+                    <span class="fw-bold fs-4 text-dark lh-1">ZynDesk</span>
+                    <small class="text-muted" style="font-size: 0.72rem; letter-spacing: 0.05em;">BY COREZYN</small>
+                </div>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navMenu">
+                <ul class="navbar-nav align-items-center gap-3">
+                    <li class="nav-item">
+                        <a class="nav-link fw-semibold text-slate" href="#features">Features</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-semibold text-slate" href="#pricing">7-Day Trial</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link fw-semibold text-secondary" href="{% url 'saas_find_domain' %}" data-bs-toggle="modal" data-bs-target="#findDomainModal">
+                            <i class="fa-solid fa-compass me-1 text-primary"></i> Find Your Portal
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="btn btn-brand-primary" href="{% url 'saas_register' %}">
+                            Register Company <i class="fa-solid fa-arrow-right ms-1"></i>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section text-center">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-9">
+                    <div class="d-inline-block mb-3">
+                        <span class="badge-pill">
+                            <i class="fa-solid fa-sparkles text-primary"></i> Every Service. One Desk
+                        </span>
+                    </div>
+                    <h1 class="hero-title mb-4">
+                        Manage Your Entire Repair Center with <span>ZynDesk</span>
+                    </h1>
+                    <p class="fs-5 text-secondary mb-4 px-lg-5">
+                        The unified cloud operating system built for Computer, Laptop, and Electronics repair centers. From device intake checklists and physical workshop rack allocation to automated WhatsApp alerts and parts billing.
+                    </p>
+                    <div class="d-flex flex-column align-items-center justify-content-center mb-4">
+                        <a href="{% url 'saas_register' %}" class="btn btn-brand-primary btn-lg px-4 py-3 shadow">
+                            <i class="fa-solid fa-rocket me-2"></i> Register Your Company (7-Day Free Trial)
+                        </a>
+                        <div class="mt-3 small text-muted">
+                            Already registered? 
+                            <a href="{% url 'saas_find_domain' %}" class="text-primary fw-semibold text-decoration-none" data-bs-toggle="modal" data-bs-target="#findDomainModal">
+                                <i class="fa-solid fa-compass me-1"></i> Find your company domain
+                            </a>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        <i class="fa-solid fa-circle-check text-success me-1"></i> Instant Subdomain
+                        <span class="mx-2">•</span>
+                        <i class="fa-solid fa-circle-check text-success me-1"></i> No Credit Card Required
+                        <span class="mx-2">•</span>
+                        <i class="fa-solid fa-circle-check text-success me-1"></i> Full Access for 7 Days
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-5 bg-white" id="features">
+        <div class="container py-4">
+            <div class="text-center max-w-700 mx-auto mb-5">
+                <span class="badge bg-light text-primary border px-3 py-2 rounded-pill fw-bold text-uppercase" style="font-size: 0.75rem;">Engineered for Service Centers</span>
+                <h2 class="fw-bold fs-1 mt-2">Everything You Need to Run Your Shop</h2>
+                <p class="text-secondary">Replace chaotic WhatsApp groups, sticky notes, and excel sheets with a unified cloud operating system.</p>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-blue">
+                            <i class="fa-solid fa-ticket"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Job Tickets & Intake</h4>
+                        <p class="text-secondary mb-0">Complete device intake checklists, photo attachments, device passwords, and automatic barcode & QR ticketing.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-emerald">
+                            <i class="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Device Rack Management</h4>
+                        <p class="text-secondary mb-0">Never lose a device. Assign laptops and gadgets to physical workshop rack numbers, rows, and shelf slots.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-purple">
+                            <i class="fa-solid fa-microchip"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Parts & Inventory</h4>
+                        <p class="text-secondary mb-0">Track purchase bills, supplier balances, cost prices, serial numbers, and automatic stock deduction upon repair completion.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-amber">
+                            <i class="fa-solid fa-coins"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Cash & Bank Accounts</h4>
+                        <p class="text-secondary mb-0">Built-in double entry financial ledger. Monitor cash drawer, bank transfers, technician payouts, and Net Operating Profit.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-indigo">
+                            <i class="fa-brands fa-whatsapp"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Automated WhatsApp Bridge</h4>
+                        <p class="text-secondary mb-0">Keep customers updated automatically with intake receipts, repair estimates, and PDF invoices directly through WhatsApp.</p>
+                    </div>
+                </div>
+
+                <div class="col-md-6 col-lg-4">
+                    <div class="feature-card">
+                        <div class="feature-icon icon-rose">
+                            <i class="fa-solid fa-mobile-screen"></i>
+                        </div>
+                        <h4 class="fw-bold mb-2">Mobile App with QR Login</h4>
+                        <p class="text-secondary mb-0">Technicians can manage service jobs on the move with the companion Flutter mobile app using instant QR code authentication.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7-Day Free Trial Callout -->
+    <section class="py-5" id="pricing">
+        <div class="container py-4">
+            <div class="cta-banner text-center text-lg-start">
+                <div class="row align-items-center">
+                    <div class="col-lg-8">
+                        <div class="d-inline-flex align-items-center gap-2 bg-white bg-opacity-25 px-3 py-1 rounded-pill mb-3">
+                            <i class="fa-solid fa-gift text-warning"></i>
+                            <span class="small fw-bold">Special Launch Promotion</span>
+                        </div>
+                        <h2 class="display-6 fw-bold mb-3">Try ZynDesk for 7 Days at Zero Cost</h2>
+                        <p class="lead mb-lg-0 text-white text-opacity-90">
+                            Give your service center its own branded subdomain e.g. <code>yourshop.anasrawuthar.in</code>. Add technicians, intake devices, and see the difference in 5 minutes.
+                        </p>
+                    </div>
+                    <div class="col-lg-4 text-center text-lg-end mt-4 mt-lg-0">
+                        <a href="{% url 'saas_register' %}" class="btn btn-light btn-lg px-4 py-3 fw-bold text-primary shadow">
+                            <i class="fa-solid fa-bolt me-2"></i> Claim 7-Day Free Trial
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container text-center">
+            <div class="d-flex align-items-center justify-content-center gap-2 mb-3">
+                <img src="{{ logo_url }}" alt="Corezyn Logo" style="height: 32px; border-radius: 6px;">
+                <span class="fw-bold text-white fs-5">ZynDesk</span>
+            </div>
+            <p class="mb-2">A product of <strong>Corezyn</strong>. Empowering independent electronics repair centers with enterprise-grade cloud tools.</p>
+            <div class="mb-3">
+                <a href="{% url 'saas_find_domain' %}" class="text-white-50 small text-decoration-underline" data-bs-toggle="modal" data-bs-target="#findDomainModal">
+                    <i class="fa-solid fa-compass me-1"></i> Already registered? Find your company portal
+                </a>
+            </div>
+            <p class="small text-muted mb-0">© {% now "Y" %} Corezyn. All rights reserved. ZynDesk — Every Service. One Desk</p>
+        </div>
+    </footer>
+
+    <!-- Find Company Domain Modal -->
+    <div class="modal fade" id="findDomainModal" tabindex="-1" aria-labelledby="findDomainModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                <div class="modal-header bg-primary text-white py-3 px-4">
+                    <h5 class="modal-title fw-bold" id="findDomainModalLabel">
+                        <i class="fa-solid fa-compass me-2"></i> Find Your Company Subdomain
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-secondary small mb-3">
+                        Enter your registered business email address or contact phone number. We will find your assigned company portal and send you access instructions.
+                    </p>
+                    <form method="post" action="{% url 'saas_find_domain' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="modalDomainInput" class="form-label fw-semibold small">Registered Email or Phone</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light text-muted"><i class="fa-solid fa-envelope"></i></span>
+                                <input 
+                                    type="text" 
+                                    name="query" 
+                                    id="modalDomainInput" 
+                                    class="form-control" 
+                                    placeholder="e.g. admin@servicecenter.com or 9876543210" 
+                                    required
+                                >
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2">
+                            <i class="fa-solid fa-magnifying-glass me-1"></i> Find My Company Portal
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

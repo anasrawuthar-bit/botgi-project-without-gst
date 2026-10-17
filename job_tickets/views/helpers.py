@@ -587,6 +587,9 @@ def authenticate_mobile_request(request):
     return user, None
 
 def get_mobile_job_permissions(user, job):
+    if getattr(user, 'is_superuser', False):
+        return {'is_staff': False, 'is_assigned_tech': False, 'can_access': False}
+
     workspace_id = getattr(job, 'workspace_id', None)
     membership_is_active = (
         not workspace_id
@@ -636,6 +639,14 @@ def user_can_view_financial_reports(user):
     )
 
 def _staff_access_required(request, key, json=False):
+    if getattr(request.user, 'is_superuser', False):
+        if json:
+            return JsonResponse({
+                'error': 'Super Admin accounts are restricted to the Master Platform Admin Panel and cannot access tenant staff operations.'
+            }, status=403)
+        messages.warning(request, "Super Admin accounts have exclusive access to the Master Platform Admin Panel and cannot access tenant staff features.")
+        return redirect('platform_admin_dashboard')
+
     if not request.user.is_staff or not user_has_staff_access(request.user, key):
         if json:
             return JsonResponse({'error': 'Unauthorized'}, status=403)
@@ -1643,6 +1654,7 @@ def get_phone_service_snapshot(phone, workspace=None):
         'exists': client is not None,
         'client_id': client.id if client else None,
         'client_name': client.name if client else fallback_name,
+        'client_email': client.email if client else '',
         'total_jobs': total_jobs,
         'open_jobs': open_jobs,
         'recent_jobs': recent_jobs,
@@ -2292,6 +2304,8 @@ def build_job_billing_context(job, request=None):
 
 
 def _get_post_login_redirect(user):
+    if getattr(user, 'is_superuser', False):
+        return redirect('platform_admin_dashboard')
     if user.is_staff:
         access = get_staff_access(user)
         if access.get("staff_dashboard"):
@@ -2334,9 +2348,14 @@ def _get_permitted_next_url(user, next_url):
     if not next_url or not user or not getattr(user, "is_authenticated", False):
         return ''
 
+    if getattr(user, 'is_superuser', False):
+        if next_url and next_url.startswith('/platform-admin'):
+            return next_url
+        return reverse('platform_admin_dashboard')
+
     candidate_path = urlsplit(next_url).path or '/'
     access = get_staff_access(user)
-    is_technician = bool(getattr(user, "is_superuser", False) or user.groups.filter(name='Technicians').exists())
+    is_technician = bool(user.groups.filter(name='Technicians').exists())
 
     guarded_prefixes = (
         ('/staff-dashboard/', bool(getattr(user, 'is_staff', False) and access.get('staff_dashboard'))),

@@ -308,6 +308,7 @@ def staff_dashboard(request):
             request.POST.get('customer_phone'),
             field_label='Customer Phone',
         )
+        customer_email = (request.POST.get('customer_email') or '').strip()
 
         estimated_amount_raw = (request.POST.get('estimated_amount') or '').strip()
         estimated_delivery_raw = request.POST.get('estimated_delivery')
@@ -336,6 +337,7 @@ def staff_dashboard(request):
         current_workspace = getattr(request, 'current_workspace', None)
 
         # Auto-create or refresh the client directory.
+        existing_client = None
         try:
             client_qs = Client.objects.filter(phone__in=phone_lookup_variants(customer_phone))
             if current_workspace:
@@ -352,10 +354,13 @@ def staff_dashboard(request):
                 if existing_client.phone != customer_phone:
                     existing_client.phone = customer_phone
                     client_updated_fields.append('phone')
+                if customer_email and existing_client.email != customer_email:
+                    existing_client.email = customer_email
+                    client_updated_fields.append('email')
                 if client_updated_fields:
                     existing_client.save(update_fields=client_updated_fields)
             else:
-                Client.objects.create(workspace=current_workspace, phone=customer_phone, name=customer_name)
+                existing_client = Client.objects.create(workspace=current_workspace, phone=customer_phone, name=customer_name, email=customer_email)
         except Exception:
             # Client directory sync should not block ticket creation.
             pass
@@ -537,6 +542,7 @@ def staff_dashboard(request):
         with transaction.atomic():
             created_job_codes = []
             created_jobs_payload = []
+            created_jobs_instances = []
             
             for idx, device_data in enumerate(device_submissions):
                 photo_files = device_photo_payloads[idx] if idx < len(device_photo_payloads) else []
@@ -555,6 +561,7 @@ def staff_dashboard(request):
                     intake_date=intake_date_val,
                     **device_data 
                 )
+                created_jobs_instances.append(new_job)
 
                 if photo_files:
                     for photo_file in photo_files:
@@ -606,6 +613,16 @@ def staff_dashboard(request):
                     'detail_url': reverse('staff_job_detail', args=[new_job.job_code]),
                     'receipt_url': reverse('job_creation_receipt_print', args=[new_job.job_code]),
                 })
+
+        # Automated Email Dispatch: Send Digital Intake Receipt if customer email is available
+        try:
+            from ..email_service import send_job_ticket_intake_email
+            target_intake_email = customer_email or (existing_client.email if existing_client else None)
+            if target_intake_email:
+                for c_job in created_jobs_instances:
+                    send_job_ticket_intake_email(c_job, recipient_email=target_intake_email, request=request)
+        except Exception:
+            pass
 
         success_message = (
             f"Successfully created {len(created_job_codes)} new job ticket(s) for {customer_name}."
@@ -1828,8 +1845,52 @@ def close_job(request, job_code):
     ).update(status=JobReminder.STATUS_DONE, completed_at=timezone.now())
 
     send_job_update_message(job.job_code, job.status)
+
+    # Automated Tax Invoice / Bill Delivery Email
+    try:
+        from ..email_service import send_job_invoice_email
+        send_job_invoice_email(job, request=request)
+    except Exception:
+        pass
+
     messages.success(request, f"Job {job.job_code} closed successfully. Payment recorded: {payment_status.replace('_', ' ').title()}.")
     return _safe_next_redirect(request)
+
+
+@login_required
+def staff_send_job_email(request, job_code):
+    """
+    Manually dispatch or re-send Intake Receipt or Tax Invoice email to customer.
+    Supports standard POST and AJAX requests.
+    """
+    denied = _staff_access_required(request, "staff_dashboard")
+    if denied:
+        return denied
+
+    job = get_object_or_404(JobTicket, job_code=job_code)
+    if not user_has_workspace_access(request.user, job.workspace):
+        return redirect('unauthorized')
+
+    if request.method == 'POST':
+        email_type = request.POST.get('email_type', 'intake_receipt')
+        recipient = (request.POST.get('recipient_email') or '').strip()
+
+        from ..email_service import send_job_ticket_intake_email, send_job_invoice_email
+        if email_type == 'invoice':
+            success, msg = send_job_invoice_email(job, recipient_email=recipient, request=request)
+        else:
+            success, msg = send_job_ticket_intake_email(job, recipient_email=recipient, request=request)
+
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.POST.get('is_ajax')
+        if is_ajax:
+            return JsonResponse({'success': success, 'message': msg})
+
+        if success:
+            messages.success(request, msg)
+        else:
+            messages.warning(request, msg)
+
+    return redirect('staff_job_detail', job_code=job_code)
 
 
 @login_required

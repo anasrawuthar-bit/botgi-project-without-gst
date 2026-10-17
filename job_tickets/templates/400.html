@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>400 — Bad Request | ZynDesk</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <link rel="icon" type="image/jpeg" href="https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: radial-gradient(circle at 50% 10%, #f1f5f9 0%, #f8fafc 100%);
+            color: #0f172a;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .error-card {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 24px;
+            padding: 48px 40px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.08);
+        }
+        .brand-logo {
+            height: 48px;
+            width: auto;
+            border-radius: 10px;
+            margin-bottom: 24px;
+        }
+        .error-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #cbd5e1;
+            padding: 6px 14px;
+            border-radius: 50px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            margin-bottom: 18px;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+        }
+        .error-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #0f172a;
+            margin-bottom: 12px;
+            line-height: 1.2;
+        }
+        .error-desc {
+            color: #64748b;
+            font-size: 1.02rem;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        .actions-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 13px 24px;
+            border-radius: 12px;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+        .btn-primary {
+            background: #2563eb;
+            color: #ffffff;
+            box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.35);
+        }
+        .btn-primary:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+        .btn-outline {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #334155;
+        }
+        .btn-outline:hover {
+            background: #f8fafc;
+            border-color: #94a3b8;
+            color: #0f172a;
+        }
+        .footer-note {
+            margin-top: 32px;
+            color: #94a3b8;
+            font-size: 0.82rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <img src="https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg" alt="ZynDesk Logo" class="brand-logo" onerror="this.style.display='none'">
+        <div>
+            <span class="error-badge">
+                <i class="fa-solid fa-circle-exclamation"></i> Error 400
+            </span>
+        </div>
+        <h1 class="error-title">Bad Request</h1>
+        <p class="error-desc">
+            The server could not understand the request due to invalid or malformed syntax. Please verify the URL or form input and try again.
+        </p>
+
+        <div class="actions-group">
+            <a href="/" class="btn btn-primary">
+                <i class="fa-solid fa-house"></i> Return to Home
+            </a>
+            <a href="/login/" class="btn btn-outline">
+                <i class="fa-solid fa-right-to-bracket"></i> Sign In to Portal
+            </a>
+        </div>
+
+        <div class="footer-note">
+            ZynDesk Platform • Every Service. One Desk
+        </div>
+    </div>
+</body>
+</html>

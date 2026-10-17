@@ -5,9 +5,34 @@ from . import whatsapp_views
 
 urlpatterns = [
     # Public-facing views
-    path('', views.home, name='home'),
+    path('', views.saas_landing, name='home'),
+    path('register/', views.saas_register, name='saas_register'),
+    path('register/pending/', views.saas_register_pending, name='saas_register_pending'),
+    path('verify-email/', views.saas_verify_email, name='saas_verify_email'),
+    path('reject-registration/', views.saas_reject_registration, name='saas_reject_registration'),
+    path('resend-verification/', views.saas_resend_verification, name='saas_resend_verification'),
+    path('find-domain/', views.saas_find_domain, name='saas_find_domain'),
     path('login/', views.login_view, name='login'),
     path('logout/', views.logout_view, name='logout'),
+
+    # Platform Super Admin (ZynDesk Master Console)
+    path('platform-admin/login/', views.platform_admin_login, name='platform_admin_login'),
+    path('platform-admin/logout/', views.platform_admin_logout, name='platform_admin_logout'),
+    path('platform-admin/', views.platform_admin_dashboard, name='platform_admin_dashboard'),
+    path('platform-admin/action/<int:workspace_id>/', views.platform_admin_action, name='platform_admin_action'),
+    path('platform-admin/extend-plan/<int:workspace_id>/', views.platform_admin_extend_plan, name='platform_admin_extend_plan'),
+    path('platform-admin/plans/save/', views.platform_admin_save_plan, name='platform_admin_save_plan'),
+    path('platform-admin/plans/delete/<int:plan_id>/', views.platform_admin_delete_plan, name='platform_admin_delete_plan'),
+    path('platform-admin/settings/update/', views.platform_admin_update_settings, name='platform_admin_update_settings'),
+    path('platform-admin/settings/test-smtp/', views.platform_admin_test_smtp, name='platform_admin_test_smtp'),
+    path('platform-admin/settings/check-smtp-status/', views.platform_admin_check_smtp_status, name='platform_admin_check_smtp_status'),
+    path('platform-admin/settings/test-whatsapp/', views.platform_admin_test_whatsapp, name='platform_admin_test_whatsapp'),
+    path('platform-admin/settings/test-otp/', views.platform_admin_test_otp, name='platform_admin_test_otp'),
+    path('platform-admin/errors/resolve/<int:error_id>/', views.platform_admin_resolve_error, name='platform_admin_resolve_error'),
+    path('platform-admin/errors/clear/', views.platform_admin_clear_errors, name='platform_admin_clear_errors'),
+    path('platform-admin/errors/test/', views.platform_admin_trigger_test_error, name='platform_admin_trigger_test_error'),
+    path('platform-admin/exit-impersonation/', views.exit_impersonation, name='exit_impersonation'),
+    path('api/check-domain/', views.check_custom_domain, name='check_custom_domain'),
     
     path('unauthorized/', views.unauthorized, name='unauthorized'),
     path('client-login/', views.client_login, name='client_login'),
@@ -160,6 +185,7 @@ urlpatterns = [
 
     # gemini
     path('staff/job/<str:job_code>/', views.staff_job_detail, name='staff_job_detail'),
+    path('staff/job/<str:job_code>/email/', views.staff_send_job_email, name='staff_send_job_email'),
     path('staff/job/<str:job_code>/collect-payment/', views.staff_job_collect_payment, name='staff_job_collect_payment'),
     path('staff/job/<str:job_code>/photos/<int:photo_id>/file/', views.staff_job_photo_file, name='staff_job_photo_file'),
     path('staff/job/<str:job_code>/photos/<int:photo_id>/delete/', views.staff_delete_job_photo, name='staff_delete_job_photo'),

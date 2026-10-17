@@ -64,6 +64,12 @@ def mobile_api_login(request):
     if not user or not user.is_active:
         return JsonResponse({'error': 'invalid_credentials', 'message': 'Invalid username or password.'}, status=401)
 
+    if getattr(user, 'is_superuser', False):
+        return JsonResponse(
+            {'error': 'technician_only', 'message': 'Super Admin credentials cannot be used to log in to the technician mobile app.'},
+            status=403,
+        )
+
     if not user.groups.filter(name='Technicians').exists():
         return JsonResponse(
             {'error': 'technician_only', 'message': 'The mobile app is for technicians only.'},
@@ -1135,7 +1141,6 @@ def mobile_api_job_rack(request, job_code):
             permissions['is_assigned_tech']
             or permissions['is_staff']
             or user.is_staff
-            or user.is_superuser
             or user.groups.filter(name__icontains='technician').exists()
         )):
             return JsonResponse(

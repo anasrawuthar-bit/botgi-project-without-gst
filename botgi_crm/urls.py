@@ -19,8 +19,9 @@ else:
         path('media/<path:path>', static_serve, {'document_root': settings.MEDIA_ROOT}),
     ]
 
-# Error handlers (only work when DEBUG=False)
-if not settings.DEBUG:
-    from job_tickets.views import custom_404, custom_500
-    handler404 = custom_404
-    handler500 = custom_500
+# Custom HTTP Error Handlers
+handler400 = 'job_tickets.views.custom_400'
+handler403 = 'job_tickets.views.custom_403'
+handler404 = 'job_tickets.views.custom_404'
+handler500 = 'job_tickets.views.custom_500'
+

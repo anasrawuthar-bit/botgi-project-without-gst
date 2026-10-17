@@ -54,13 +54,22 @@ DEBUG = env('DJANGO_DEBUG')
 ALLOWED_HOSTS = env.list('DJANGO_ALLOWED_HOSTS')
 if 'testserver' not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append('testserver')
-CSRF_TRUSTED_ORIGINS = env.list('DJANGO_CSRF_TRUSTED_ORIGINS', default=[])
+CSRF_TRUSTED_ORIGINS = env.list(
+    'DJANGO_CSRF_TRUSTED_ORIGINS',
+    default=[
+        'https://*.anasrawuthar.in',
+        'https://anasrawuthar.in',
+        'http://*.anasrawuthar.in',
+        'http://anasrawuthar.in',
+    ],
+)
 SECURE_SSL_REDIRECT = (
     False
     if RUNNING_TESTS
     else env.bool('DJANGO_SECURE_SSL_REDIRECT', default=False)
 )
-PUBLIC_BASE_URL = '' if RUNNING_TESTS else env('PUBLIC_BASE_URL', default='')
+PUBLIC_BASE_URL = '' if RUNNING_TESTS else env('PUBLIC_BASE_URL', default='https://anasrawuthar.in')
+SAAS_ROOT_DOMAIN = env('SAAS_ROOT_DOMAIN', default='anasrawuthar.in')
 WEB_RELEASE_VERSION = env('WEB_RELEASE_VERSION', default='dev')
 WEB_RELEASE_POLL_INTERVAL_SECONDS = env.int('WEB_RELEASE_POLL_INTERVAL_SECONDS', default=300)
 WHATSAPP_BRIDGE_AUTO_START = env.bool('WHATSAPP_BRIDGE_AUTO_START', default=True)
@@ -92,6 +101,7 @@ MIDDLEWARE = [
     'job_tickets.middleware.CurrentWorkspaceMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'job_tickets.middleware.SessionSecurityMiddleware',
+    'job_tickets.middleware.PlatformErrorLoggingMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -154,9 +164,50 @@ TEMPLATES = [
     },
 ]
 
-# Custom error page handlers
-handler404 = 'job_tickets.views.custom_404'
-handler500 = 'job_tickets.views.custom_500'
+# Logging & Error Tracking Configuration
+LOGS_DIR = BASE_DIR / 'logs'
+LOGS_DIR.mkdir(exist_ok=True)
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} [{name}:{lineno}] {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file_error': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': str(LOGS_DIR / 'zyndesk_errors.log'),
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django.request': {
+            'handlers': ['console', 'file_error'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'zyndesk.errors': {
+            'handlers': ['console', 'file_error'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+    },
+}
 
 WSGI_APPLICATION = 'botgi_crm.wsgi.application'
 ASGI_APPLICATION = 'botgi_crm.asgi.application'  # For Django Channels
@@ -193,12 +244,12 @@ CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=False)
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-database_url = env('DATABASE_URL', default='')
+database_url = env('DATABASE_URL', default='postgres://postgres:1234@127.0.0.1:5432/zyndesk')
 
 if database_url:
     DATABASES = {
         'default': {
-            **env.db('DATABASE_URL'),
+            **env.db('DATABASE_URL', default=database_url),
             'CONN_MAX_AGE': 0 if (DEBUG or RUNNING_TESTS) else 600,
             'OPTIONS': {
                 'connect_timeout': 10,
@@ -209,8 +260,13 @@ if database_url:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': env('SQLITE_PATH', default=str(BASE_DIR / 'db.sqlite3')),
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'zyndesk',
+            'USER': 'postgres',
+            'PASSWORD': '1234',
+            'HOST': '127.0.0.1',
+            'PORT': '5432',
+            'CONN_MAX_AGE': 0 if (DEBUG or RUNNING_TESTS) else 600,
         }
     }
 

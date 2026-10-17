@@ -1,0 +1,17 @@
+.git
+.gitignore
+.vscode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+db.sqlite3
+*.log
+media/
+staticfiles/
+scratch/
+flutter_mobile_app/
+whatsapp_bridge/node_modules/
+whatsapp_bridge/.wwebjs_auth/
+whatsapp_bridge/.wwebjs_cache/

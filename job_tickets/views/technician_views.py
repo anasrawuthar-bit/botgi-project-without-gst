@@ -16,6 +16,9 @@ from .helpers import (
 
 @login_required
 def technician_dashboard(request):
+    if getattr(request.user, 'is_superuser', False):
+        messages.warning(request, "Super Admin accounts have exclusive access to the Master Platform Admin Panel and cannot access technician features.")
+        return redirect('platform_admin_dashboard')
 
     if not request.user.groups.filter(name='Technicians').exists():
         return redirect('unauthorized')

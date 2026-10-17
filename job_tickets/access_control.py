@@ -122,10 +122,11 @@ def get_staff_access(user, group_names=None):
         return access
 
     if getattr(user, "is_superuser", False):
+        # Super Admin is strictly isolated from tenant staff roles
         for key in ACCESS_GROUPS:
-            access[key] = True
+            access[key] = False
         access["controlled"] = True
-        access["reports_overview"] = True
+        access["reports_overview"] = False
         return access
 
     if not getattr(user, "is_staff", False):

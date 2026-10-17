@@ -483,7 +483,7 @@
                                     <input type="date" name="job_date" id="id_job_date" class="form-control form-control-sm"
                                         value="{% now 'Y-m-d' %}" required style="font-weight: 500;">
                                 </div>
-                                <div class="col-md-4 col-sm-6">
+                                <div class="col-md-3 col-sm-6">
                                     <label for="id_customer_phone" class="form-label small fw-semibold text-secondary mb-1">
                                         <i class="fa-solid fa-phone text-primary me-1"></i> Customer Phone <span class="text-danger">*</span>
                                     </label>
@@ -495,14 +495,22 @@
                                     </div>
                                     <div id="customer-phone-error" class="small text-danger mt-1"></div>
                                 </div>
-                                <div class="col-md-5 col-sm-12">
+                                <div class="col-md-3 col-sm-6">
                                     <label for="id_customer_name" class="form-label small fw-semibold text-secondary mb-1">
                                         <i class="fa-solid fa-user text-primary me-1"></i> Customer Name <span class="text-danger">*</span>
                                     </label>
                                     <input type="text" name="customer_name" id="id_customer_name" class="form-control form-control-sm"
-                                        placeholder="Customer full name &amp; address" autocomplete="off" autocapitalize="words" required
+                                        placeholder="Customer full name" autocomplete="off" autocapitalize="words" required
                                         style="font-weight: 500;">
                                     <div id="customer-name-error" class="small text-danger mt-1"></div>
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <label for="id_customer_email" class="form-label small fw-semibold text-secondary mb-1">
+                                        <i class="fa-solid fa-envelope text-primary me-1"></i> Customer Email <span class="text-muted fw-normal">(Receipts)</span>
+                                    </label>
+                                    <input type="email" name="customer_email" id="id_customer_email" class="form-control form-control-sm"
+                                        placeholder="Optional email" autocomplete="off"
+                                        style="font-weight: 500;">
                                 </div>
                             </div>
                             <div id="phone-priority-info" class="mt-2 text-muted small">
@@ -1558,7 +1566,8 @@
     function updateCustomerNameFromLookup(data, lookupPhone) {
         if (!customerNameInput) return;
         const incomingName = (data && data.client_name ? data.client_name : '').trim();
-        if (!incomingName) return;
+        const incomingEmail = (data && data.client_email ? data.client_email : '').trim();
+        if (!incomingName && !incomingEmail) return;
         const activePhoneDigits = customerPhoneInput ? parseIndianPhoneInput(customerPhoneInput.value).digits : '';
         if (lookupPhone && customerPhoneInput && lookupPhone !== activePhoneDigits) {
             return;
@@ -1566,10 +1575,15 @@
 
         const currentName = (customerNameInput.value || '').trim();
         const userEdited = customerNameInput.dataset.userEdited === 'true';
-        if (!currentName || !userEdited) {
+        if (incomingName && (!currentName || !userEdited)) {
             customerNameInput.value = incomingName;
             customerNameInput.dataset.userEdited = 'false';
             customerNameInput.dataset.autoFilled = 'true';
+        }
+
+        const customerEmailInput = document.getElementById('id_customer_email');
+        if (customerEmailInput && incomingEmail && !customerEmailInput.value) {
+            customerEmailInput.value = incomingEmail;
         }
     }
 

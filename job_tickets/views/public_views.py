@@ -535,10 +535,68 @@ def qr_access(request, job_code):
         return HttpResponseForbidden("Invalid or expired QR link.")
     return redirect(f"{reverse('client_status', args=[job_code])}?token={token}")
 
-def custom_404(request, exception):
+def custom_404(request, exception=None):
     """Custom 404 error page"""
-    return render(request, '404.html', status=404)
+    try:
+        return render(request, '404.html', status=404)
+    except Exception:
+        return HttpResponse(
+            '<h1>404 - Page Not Found</h1><p>The requested URL was not found on ZynDesk.</p><p><a href="/">Return to Home</a></p>',
+            status=404,
+            content_type='text/html'
+        )
+
 
 def custom_500(request):
-    """Custom 500 error page"""
-    return render(request, '500.html', status=500)
+    """Custom 500 error page with bulletproof emergency fallback"""
+    try:
+        return render(request, '500.html', status=500)
+    except Exception as render_err:
+        import logging
+        logging.getLogger('zyndesk.errors').error(f"Error rendering 500.html: {render_err}")
+        emergency_html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>500 - Server Error | ZynDesk</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
+        .card { background: #1e293b; padding: 48px; border-radius: 18px; max-width: 500px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        h1 { color: #ef4444; margin-bottom: 12px; }
+        p { color: #94a3b8; font-size: 1.05rem; }
+        a { display: inline-block; margin-top: 20px; padding: 12px 24px; background: #2563eb; color: #fff; text-decoration: none; border-radius: 10px; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Server Error (500)</h1>
+        <p>Something went wrong on our end. The platform engineering team has been notified and is investigating.</p>
+        <a href="/">Return to Home</a>
+    </div>
+</body>
+</html>"""
+        return HttpResponse(emergency_html, status=500, content_type='text/html')
+
+
+def custom_403(request, exception=None):
+    """Custom 403 Forbidden page"""
+    try:
+        return render(request, '403.html', status=403)
+    except Exception:
+        return HttpResponse(
+            '<h1>403 - Access Forbidden</h1><p>You do not have permission to access this resource on ZynDesk.</p><p><a href="/">Return to Home</a></p>',
+            status=403,
+            content_type='text/html'
+        )
+
+
+def custom_400(request, exception=None):
+    """Custom 400 Bad Request page"""
+    try:
+        return render(request, '400.html', status=400)
+    except Exception:
+        return HttpResponse(
+            '<h1>400 - Bad Request</h1><p>The request could not be processed by ZynDesk.</p><p><a href="/">Return to Home</a></p>',
+            status=400,
+            content_type='text/html'
+        )

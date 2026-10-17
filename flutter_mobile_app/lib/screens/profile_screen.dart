@@ -247,7 +247,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Botgi Technician',
+                    'ZynDesk',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -256,7 +256,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    'GIHostings • v1.0.1',
+                    'Corezyn • Every Service. One Desk • v1.0.1',
                     style: TextStyle(
                       fontSize: 11.5,
                       color: Colors.grey.shade500,

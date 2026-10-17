@@ -6,7 +6,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Service Billing | GI Hostings{% endblock %}</title>
+    <title>{% block title %}ZynDesk — Every Service. One Desk{% endblock %}</title>
     <script>
         (function () {
             try {
@@ -193,11 +193,11 @@
         </button>
         <a class="sidebar-topbar-brand" href="{% url 'home' %}">
             {% if company.display_logo_url %}
-                <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'Company' }} Logo" class="brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
+                <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'ZynDesk' }} Logo" class="brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
             {% else %}
-                <img src="/static/img/logo.png" alt="Software Logo" class="brand-logo">
+                <img src="/static/img/logo.png" alt="ZynDesk Logo" class="brand-logo">
             {% endif %}
-            <strong>{{ company.company_name|default:"GI Hostings" }}</strong>
+            <strong>{{ company.company_name|default:"ZynDesk" }}</strong>
         </a>
         <button type="button" class="btn btn-sm btn-outline-secondary ms-auto d-flex align-items-center justify-content-center" data-bs-toggle="modal" data-bs-target="#supportHelpModal" title="Help & Support" aria-label="Help and Support">
             <i class="fa-solid fa-headset fs-6 text-primary"></i>
@@ -211,20 +211,20 @@
     <aside class="app-sidebar" id="appSidebar">
         <div class="sidebar-brand">
             <div class="sidebar-brand-head">
-                <a href="{% url 'home' %}" class="sidebar-brand-link" data-tooltip="{{ company.company_name|default:'GI Hostings' }}">
+                <a href="{% url 'home' %}" class="sidebar-brand-link" data-tooltip="{{ company.company_name|default:'ZynDesk' }}">
                     {% if company.display_logo_url %}
-                        <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'Company' }} Logo" class="sidebar-brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
+                        <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'ZynDesk' }} Logo" class="sidebar-brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
                     {% else %}
-                        <img src="/static/img/logo.png" alt="Software Logo" class="sidebar-brand-logo">
+                        <img src="/static/img/logo.png" alt="ZynDesk Logo" class="sidebar-brand-logo">
                     {% endif %}
                     <span class="sidebar-brand-copy">
-                        <strong>{{ company.company_name|default:"GI Hostings" }}</strong>
+                        <strong>{{ company.company_name|default:"ZynDesk" }}</strong>
                         {% if request.resolver_match.url_name|slice:":10" == "inventory_" or request.resolver_match.url_name == "product_dashboard" %}
                         <small>Inventory Control</small>
                         {% elif request.resolver_match.url_name == "company_profile_settings" %}
                         <small>System Settings</small>
                         {% else %}
-                        <small>{{ company.tagline|default:"Service Billing" }}</small>
+                        <small>{{ company.tagline|default:"Every Service. One Desk" }}</small>
                         {% endif %}
                     </span>
                 </a>
@@ -467,6 +467,13 @@
                 </li>
                 {% endif %}
 
+                <li class="sidebar-menu-divider"></li>
+                <li>
+                    <a class="sidebar-link" href="{% url 'client_login' %}" target="_blank" data-tooltip="Track Service Status">
+                        <i class="fa-solid fa-magnifying-glass"></i><span class="sidebar-link-label">Track Service</span>
+                    </a>
+                </li>
+
                 {% else %}
                 {# Technician user #}
                 <li>
@@ -500,7 +507,7 @@
                     <span class="user-avatar">{{ user|user_initials }}</span>
                     <div class="user-info">
                         <span class="user-name">{{ user.get_full_name|default:user.username }}</span>
-                        <span class="user-org">{{ company.company_name|default:"gi hostings" }}</span>
+                        <span class="user-org">{{ company.company_name|default:"ZynDesk" }}</span>
                     </div>
                     <i class="fa-solid fa-chevron-up user-caret"></i>
                 </button>
@@ -512,7 +519,7 @@
                     <div class="user-menu-section organizations-box">
                         <div class="user-menu-label">Organizations</div>
                         <div class="user-menu-org-item active">
-                            <span class="org-name">{{ company.company_name|default:"gi hostings" }}</span>
+                            <span class="org-name">{{ company.company_name|default:"ZynDesk" }}</span>
                             <i class="fa-solid fa-check text-success ms-auto"></i>
                         </div>
                     </div>
@@ -548,18 +555,18 @@
         <div class="guest-topbar-inner">
             <a class="guest-topbar-brand" href="{% url 'home' %}">
                 {% if company.display_logo_url %}
-                    <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'Company' }} Logo" class="brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
+                    <img src="{{ company.display_logo_url }}" alt="{{ company.company_name|default:'ZynDesk' }} Logo" class="brand-logo" onerror="this.onerror=null; this.src='/static/img/logo.png';">
                 {% else %}
-                    <img src="/static/img/logo.png" alt="Software Logo" class="brand-logo">
+                    <img src="/static/img/logo.png" alt="ZynDesk Logo" class="brand-logo">
                 {% endif %}
                 <span class="brand-copy">
-                    <strong>{{ company.company_name|default:"GI Hostings" }}</strong>
-                    <small>{{ company.tagline|default:"Service Billing" }}</small>
+                    <strong>{{ company.company_name|default:"ZynDesk" }}</strong>
+                    <small>{{ company.tagline|default:"Every Service. One Desk" }}</small>
                 </span>
             </a>
             <div class="guest-topbar-actions">
                 <a class="guest-topbar-link" href="{% url 'client_login' %}">
-                    <i class="fa-solid fa-user-check"></i> Client Status
+                    <i class="fa-solid fa-magnifying-glass"></i> Track Service Status
                 </a>
                 <a class="btn btn-primary btn-sm" href="{% url 'login' %}">
                     <i class="fa-solid fa-user-lock me-1"></i> Staff Login
@@ -572,6 +579,16 @@
     <div class="app-layout {% if user.is_authenticated %}has-sidebar{% endif %}">
         <main class="app-main">
             <div class="app-workspace container-fluid my-3 pb-3">
+                {% if is_trial %}
+                <div class="alert alert-warning border-0 shadow-sm d-flex flex-wrap align-items-center justify-content-between mb-3 px-3 py-2 rounded-3" style="background: linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%);">
+                    <div class="d-flex align-items-center gap-2">
+                        <i class="fa-solid fa-clock text-warning fs-5"></i>
+                        <span class="small"><strong>ZynDesk 7-Day Free Trial:</strong> You have <strong>{{ trial_days_left }} day{{ trial_days_left|pluralize }}</strong> remaining in this workspace. Contact Corezyn to activate your permanent subscription.</span>
+                    </div>
+                    <span class="badge bg-warning text-dark px-2 py-1 fw-bold font-monospace">TRIAL ACTIVE</span>
+                </div>
+                {% endif %}
+
                 {% block auto_page_title %}
                 <div class="mb-3 d-none" data-auto-page-title>
                     <h1 class="section-title mb-0" data-auto-page-title-text></h1>
@@ -584,7 +601,7 @@
         {% if not user.is_authenticated %}
         <footer class="site-footer">
             <div class="container d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
-                <p class="mb-0 fw-semibold">Service Billing by {{ platform.billing_author_name|default:"GI HOSTINGS" }}
+                <p class="mb-0 fw-semibold">Service Billing by {{ platform.billing_author_name|default:"Corezyn" }}
                 </p>
                 <p class="mb-0">
                     Support:
@@ -595,7 +612,7 @@
                     {% if platform.website %}
                     | <a href="{{ platform.website }}" target="_blank" rel="noopener">{{ platform.website }}</a>
                     {% else %}
-                    | <a href="https://gihostings.com" target="_blank" rel="noopener">https://gihostings.com</a>
+                    | <a href="https://anasrawuthar.in" target="_blank" rel="noopener">https://anasrawuthar.in</a>
                     {% endif %}
                 </p>
             </div>
@@ -1216,7 +1233,7 @@
                                     <div class="small text-muted">{{ platform.website|default:"https://gihostings.com" }}</div>
                                 </div>
                             </div>
-                            <a href="{{ platform.website|default:'https://gihostings.com' }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary px-3">
+                            <a href="{{ platform.website|default:'https://anasrawuthar.in' }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary px-3">
                                 <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Visit
                             </a>
                         </div>
@@ -1224,7 +1241,7 @@
                 </div>
                 <div class="modal-footer bg-light py-2 px-4 d-flex justify-content-between align-items-center">
                     <span class="small text-muted">
-                        Service Billing platform by <strong class="text-dark">{{ platform.billing_author_name|default:"GI HOSTINGS" }}</strong>
+                        Service Billing platform by <strong class="text-dark">{{ platform.billing_author_name|default:"Corezyn" }}</strong>
                     </span>
                     <button type="button" class="btn btn-secondary btn-sm px-3" data-bs-dismiss="modal">Close</button>
                 </div>

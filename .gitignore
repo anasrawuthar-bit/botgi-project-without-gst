@@ -1,12 +1,15 @@
 .env
 .env.*
 !.env.example
+!.env.docker.example
 venv/
 db.sqlite3
 staticfiles/
 media/
 __pycache__/
 *.py[cod]
+logs/
+*.log
 desktop-shell/node_modules/
 desktop-shell/dist/
 desktop-shell/publish/
@@ -24,4 +27,5 @@ kotlin/local.properties
 **/android/app/build/
 **/android/local.properties
 scratch/
+
 

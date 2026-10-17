@@ -1,0 +1,168 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # PostgreSQL Database Service
+  # ----------------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    container_name: botgi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-botgi_db}
+      POSTGRES_USER: ${POSTGRES_USER:-botgi_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-botgi_secure_password_123}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-botgi_user} -d ${POSTGRES_DB:-botgi_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botgi_net
+
+  # ----------------------------------------------------------------------------
+  # Redis Cache & Message Broker (Channels & Celery)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: botgi_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - botgi_net
+
+  # ----------------------------------------------------------------------------
+  # Django Web Service (ASGI / Daphne / WebSockets)
+  # ----------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: botgi_web
+    restart: unless-stopped
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-please-change-this-in-production-secret-key-32chars}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-*}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-https://*.mycompany.in,http://localhost:8000}
+      DATABASE_URL: postgres://${POSTGRES_USER:-botgi_user}:${POSTGRES_PASSWORD:-botgi_secure_password_123}@db:5432/${POSTGRES_DB:-botgi_db}
+      REDIS_URL: redis://redis:6379/0
+      CACHE_URL: redis://redis:6379/1
+      USE_REDIS_CHANNELS: "True"
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      WA_BRIDGE_BASE_URL: http://whatsapp:3001
+      WHATSAPP_BRIDGE_AUTO_START: "False"
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8000}
+      RUN_MIGRATIONS: "true"
+      COLLECT_STATIC: "true"
+    volumes:
+      - media_data:/app/media
+      - static_data:/app/staticfiles
+    ports:
+      - "${PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      whatsapp:
+        condition: service_started
+    networks:
+      - botgi_net
+
+  # ----------------------------------------------------------------------------
+  # Celery Background Task Worker
+  # ----------------------------------------------------------------------------
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: botgi_celery_worker
+    restart: unless-stopped
+    command: celery -A botgi_crm worker -l info --concurrency=2
+    environment:
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-False}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-please-change-this-in-production-secret-key-32chars}
+      DATABASE_URL: postgres://${POSTGRES_USER:-botgi_user}:${POSTGRES_PASSWORD:-botgi_secure_password_123}@db:5432/${POSTGRES_DB:-botgi_db}
+      REDIS_URL: redis://redis:6379/0
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      WA_BRIDGE_BASE_URL: http://whatsapp:3001
+      RUN_MIGRATIONS: "false"
+      COLLECT_STATIC: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - botgi_net
+
+  # ----------------------------------------------------------------------------
+  # WhatsApp Bridge Service (Node.js + Chromium Puppeteer)
+  # ----------------------------------------------------------------------------
+  whatsapp:
+    build:
+      context: ./whatsapp_bridge
+      dockerfile: Dockerfile
+    container_name: botgi_whatsapp
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      WA_HEADLESS: "true"
+      WA_BRIDGE_PORT: 3001
+      WA_CLIENT_ID: ${WA_CLIENT_ID:-botgi_default}
+      WA_AUTH_ROOT: /data/auth
+    volumes:
+      - whatsapp_auth:/data/auth
+    ports:
+      - "3001:3001"
+    networks:
+      - botgi_net
+
+  # ----------------------------------------------------------------------------
+  # Caddy Reverse Proxy (Automatic HTTPS, Wildcard SSL & Custom Domains)
+  # ----------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: botgi_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+      - static_data:/var/www/static:ro
+      - media_data:/var/www/media:ro
+    depends_on:
+      - web
+    networks:
+      - botgi_net
+
+# ==============================================================================
+# Persistent Named Volumes & Networks
+# ==============================================================================
+volumes:
+  db_data:
+  redis_data:
+  media_data:
+  static_data:
+  whatsapp_auth:
+  caddy_data:
+  caddy_config:
+
+networks:
+  botgi_net:
+    driver: bridge

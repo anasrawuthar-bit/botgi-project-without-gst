@@ -256,7 +256,8 @@ h6,
 .brand-logo {
     height: 36px;
     width: 36px;
-    object-fit: cover;
+    object-fit: contain;
+    background: #ffffff;
     border-radius: 8px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);
@@ -986,7 +987,8 @@ h6,
 .sidebar-brand-logo {
     height: 38px;
     width: 38px;
-    object-fit: cover;
+    object-fit: contain;
+    background: #ffffff;
     border-radius: 8px;
     box-shadow: var(--shadow-sm);
     border: 1px solid var(--border-color);

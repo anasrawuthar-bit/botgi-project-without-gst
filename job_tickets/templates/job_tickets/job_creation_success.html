@@ -1,6 +1,6 @@
 {% extends "job_tickets/base.html" %}
 
-{% block title %}Job Created | Service Billing{% endblock %}
+{% block title %}Job Created | ZynDesk{% endblock %}
 
 {% block content %}
 <div class="row justify-content-center">
@@ -15,7 +15,14 @@
                 <a href="{% url 'job_creation_receipt_print' job_code=job_ticket.job_code %}" class="btn btn-primary">
                     <i class="fas fa-print me-1"></i>Print Receipt
                 </a>
-                <a href="{% url 'staff_dashboard' %}" class="btn btn-outline-primary">
+                <form method="POST" action="{% url 'staff_send_job_email' job_ticket.job_code %}" class="d-inline">
+                    {% csrf_token %}
+                    <input type="hidden" name="email_type" value="intake_receipt">
+                    <button type="submit" class="btn btn-outline-success">
+                        <i class="fas fa-paper-plane me-1"></i>Email Receipt
+                    </button>
+                </form>
+                <a href="{% url 'staff_dashboard' %}" class="btn btn-outline-secondary">
                     <i class="fas fa-table-columns me-1"></i>Back to Dashboard
                 </a>
             </div>

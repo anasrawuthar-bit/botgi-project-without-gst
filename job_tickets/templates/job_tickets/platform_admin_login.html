@@ -1,0 +1,162 @@
+{% extends "job_tickets/base.html" %}
+{% load job_tickets_extras %}
+
+{% block title %}Super Admin Login | ZynDesk{% endblock %}
+
+{% block content %}
+<style>
+    /* Hide browser's default password reveal button - Chrome/Edge */
+    #password::-webkit-credentials-auto-fill-button,
+    #password::-webkit-caps-lock-indicator {
+        display: none !important;
+        -webkit-appearance: none !important;
+    }
+    
+    /* Hide browser's default password reveal button - Chrome 89+ */
+    #password::-webkit-strong-password-auto-fill-button,
+    #password::-webkit-credentials-auto-fill-button {
+        display: none !important;
+    }
+    
+    /* For Firefox */
+    #password::-ms-reveal {
+        display: none !important;
+    }
+    
+    /* Hide any browser-generated reveal buttons */
+    input[type="password"]::-webkit-inner-spin-button,
+    input[type="password"]::-webkit-outer-spin-button,
+    input[type="password"]::-webkit-credentials-auto-fill-button {
+        display: none !important;
+        -webkit-appearance: none !important;
+    }
+    
+    /* Ensure our custom toggle button is visible and properly styled */
+    #togglePassword {
+        border-left: none;
+        z-index: 10;
+        position: relative;
+        cursor: pointer;
+    }
+    
+    #togglePassword:hover {
+        background-color: #e9ecef;
+        border-color: #ced4da;
+    }
+    
+    #togglePassword:focus {
+        box-shadow: 0 0 0 0.25rem rgba(79, 70, 229, 0.25);
+    }
+    
+    /* Style the input group to prevent overflow issues */
+    .input-group > #password {
+        padding-right: 45px;
+    }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="section-container">
+            <h1 class="text-center mb-4">
+                <i class="fa-solid fa-shield-halved text-primary"></i> Super Admin Login
+            </h1>
+            
+            {% if error %}
+                <div class="alert alert-danger d-flex align-items-center mb-3" role="alert">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    <div>{{ error }}</div>
+                </div>
+            {% endif %}
+
+            <form method="post" id="superAdminLoginForm" action="{% url 'platform_admin_login' %}">
+                {% csrf_token %}
+                {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+                
+                <div class="mb-3">
+                    <label for="superAdminEmail" class="form-label">
+                        <i class="fas fa-user-shield"></i> Email or Username:
+                    </label>
+                    <input 
+                        type="text" 
+                        name="email" 
+                        id="superAdminEmail" 
+                        class="form-control" 
+                        value="{{ email|default:'' }}" 
+                        autocomplete="username"
+                        placeholder="Enter your email or username"
+                        required
+                        autofocus
+                    >
+                </div>
+                
+                <div class="mb-3">
+                    <label for="password" class="form-label">
+                        <i class="fas fa-lock"></i> Password:
+                    </label>
+                    <div class="input-group">
+                        <input 
+                            type="password" 
+                            name="password" 
+                            id="password" 
+                            class="form-control" 
+                            autocomplete="current-password"
+                            placeholder="Enter your password"
+                            required
+                            data-1p-ignore
+                            data-lpignore="true"
+                        >
+                        <button 
+                            class="btn btn-outline-secondary" 
+                            type="button" 
+                            id="togglePassword"
+                            aria-label="Show password"
+                        >
+                            <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary w-100 mt-3 py-2 fw-semibold">
+                    <i class="fas fa-sign-in-alt"></i> Log In
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const togglePassword = document.getElementById('togglePassword');
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.getElementById('togglePasswordIcon');
+    
+    if (togglePassword && passwordInput) {
+        togglePassword.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            
+            if (type === 'text') {
+                toggleIcon.classList.remove('fa-eye');
+                toggleIcon.classList.add('fa-eye-slash');
+                togglePassword.setAttribute('aria-label', 'Hide password');
+            } else {
+                toggleIcon.classList.remove('fa-eye-slash');
+                toggleIcon.classList.add('fa-eye');
+                togglePassword.setAttribute('aria-label', 'Show password');
+            }
+            passwordInput.focus();
+        });
+    }
+    
+    const emailInput = document.getElementById('superAdminEmail');
+    if (emailInput && emailInput.value && passwordInput) {
+        passwordInput.focus();
+    }
+});
+</script>
+{% endblock %}

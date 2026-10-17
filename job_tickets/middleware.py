@@ -51,9 +51,41 @@ class CurrentWorkspaceMiddleware:
         except Exception:
             pass
 
-        request.current_workspace = None
-        if getattr(request, 'user', None) and request.user.is_authenticated:
-            request.current_workspace = get_current_workspace(request)
+        request.current_workspace = get_current_workspace(request)
+
+        # Bypass status checks for static files, media, auth endpoints, and platform admin
+        path = request.path_info
+        is_bypass = (
+            path.startswith('/static/')
+            or path.startswith('/media/')
+            or path.startswith('/platform-admin/')
+            or path.startswith('/logout/')
+            or path.startswith('/admin/')
+            or path.startswith('/register/')
+            or path.startswith('/api/check-domain/')
+        )
+
+        # Allow superuser full access even if a workspace is expired or suspended
+        is_superuser = getattr(request, 'user', None) and getattr(request.user, 'is_superuser', False)
+
+        if request.current_workspace and not is_bypass and not is_superuser:
+            ws = request.current_workspace
+            from django.shortcuts import render
+
+            brand_ctx = {
+                'workspace': ws,
+                'app_name': 'ZynDesk',
+                'tagline': 'Every Service. One Desk',
+                'company_name': 'Corezyn',
+                'logo_url': 'https://image.gihostings.com/i/356b7bc7285f8ce2.jpeg',
+            }
+
+            if ws.is_suspended:
+                return render(request, 'job_tickets/account_suspended.html', brand_ctx, status=403)
+
+            if ws.is_trial_expired:
+                return render(request, 'job_tickets/trial_expired.html', brand_ctx, status=402)
+
         return self.get_response(request)
 
 
@@ -187,3 +219,56 @@ class SessionSecurityMiddleware:
                 'reason': reason,
             }
         )
+
+
+class PlatformErrorLoggingMiddleware:
+    """
+    Global exception & error capturing middleware.
+    Catches unhandled exceptions, logs them with full traceback,
+    records them into PlatformErrorLog for the Super Admin console,
+    and allows Django's custom 500 handler to render a graceful page.
+    """
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        return self.get_response(request)
+
+    def process_exception(self, request, exception):
+        try:
+            import logging
+            import traceback
+            from .models import PlatformErrorLog
+
+            logger = logging.getLogger('zyndesk.errors')
+            tb_str = traceback.format_exc()
+            user = getattr(request, 'user', None)
+            actor = user if (user and getattr(user, 'is_authenticated', False)) else None
+            workspace = getattr(request, 'current_workspace', None)
+            ip = request.META.get('HTTP_X_FORWARDED_FOR') or request.META.get('REMOTE_ADDR') or ''
+            if ip and ',' in ip:
+                ip = ip.split(',')[0].strip()
+
+            err_type = type(exception).__name__
+            err_msg = str(exception) or 'An unhandled exception occurred.'
+
+            logger.error(
+                f"[500 Error] {err_type} at {request.method} {request.path}: {err_msg}\n{tb_str}"
+            )
+
+            PlatformErrorLog.objects.create(
+                workspace=workspace,
+                actor=actor,
+                error_type=err_type,
+                severity=PlatformErrorLog.LEVEL_CRITICAL,
+                status_code=500,
+                request_path=(request.path or '')[:500],
+                request_method=(request.method or 'GET')[:10],
+                message=err_msg[:2000],
+                traceback=tb_str,
+                ip_address=ip or None,
+            )
+        except Exception:
+            pass
+        return None
+
