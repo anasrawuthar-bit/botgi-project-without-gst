@@ -5,7 +5,7 @@ from .models import CompanyUserMembership, CompanyWorkspace
 
 RESERVED_SUBDOMAINS = {
     'www', 'admin', 'api', 'app', 'mail', 'platform', 'superadmin',
-    'static', 'media', 'help', 'docs', 'test', 'support', 'billing'
+    'static', 'media', 'help', 'docs', 'test', 'support', 'billing', 'zyndesk'
 }
 
 

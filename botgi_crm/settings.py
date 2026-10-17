@@ -59,8 +59,12 @@ CSRF_TRUSTED_ORIGINS = env.list(
     default=[
         'https://*.anasrawuthar.in',
         'https://anasrawuthar.in',
+        'https://*.zyndesk.anasrawuthar.in',
+        'https://zyndesk.anasrawuthar.in',
         'http://*.anasrawuthar.in',
         'http://anasrawuthar.in',
+        'http://*.zyndesk.anasrawuthar.in',
+        'http://zyndesk.anasrawuthar.in',
     ],
 )
 SECURE_SSL_REDIRECT = (
