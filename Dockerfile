@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     libpng-dev \
     curl \
+    wget \
     bash \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,6 +41,10 @@ RUN sed -i 's/\r$//' /app/entrypoint.sh && \
 
 # Expose default application port
 EXPOSE 8000
+
+# Healthcheck on application port 8000
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://127.0.0.1:8000/ || wget -q --spider http://127.0.0.1:8000/ || exit 1
 
 # Set entrypoint and default command
 ENTRYPOINT ["/app/entrypoint.sh"]
